@@ -1,0 +1,143 @@
+import glob
+import sys
+import os
+import pandas as pd
+import numpy as np
+import tifffile
+from nd2reader import ND2Reader
+import imageio
+import matplotlib.pyplot as plt
+import itk
+import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
+
+def get_range(input_nd2, stack_length=41):
+    """Returns a range object containing valid stack indices from the ND2 file."""
+    with ND2Reader(input_nd2) as f:
+        stack_range = range(f.metadata['num_frames'] // stack_length)
+    return stack_range
+
+def check_focus(out_dir, stack_range):
+    """Checks the focus of the recording"""
+    plot_path = out_dir + '/focus.png'
+    if not os.path.isfile(plot_path):
+        tif_files = check_files(out_dir, stack_range, 'tif')
+        for i in range(0, len(tif_files), 100):
+            stack = tifffile.imread(tif_files[i])
+            rfp = stack[:, 1]
+            color = plt.cm.viridis(i / len(tif_files))
+            plt.plot(np.mean(rfp, axis=(1, 2)), color=color)
+        plt.xlim(0, 38)
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        plt.close()
+
+def check_files(out_dir, stack_range, extension):
+    """Checks if all the expected files in the stack range are in the directory"""
+    existing_files = set(glob.glob(out_dir + f'/{extension}/*.{extension}'))
+    expected_files = {out_dir + f'/{extension}/{i:04d}.{extension}' for i in stack_range}
+    if missing_files := expected_files - existing_files:
+        stacks = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in missing_files])
+        raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
+    return sorted(expected_files)
+
+def get_transform_params(file, parameter_object):
+    """Extracts transform parameters from a text file."""
+    parameter_object.ReadParameterFile(file)
+    return np.array(parameter_object.GetParameterMap(0)['TransformParameters'], float)
+
+def write_alignment(out_dir, stack_range):
+    """Creates an alignment file from the parameter DataFrame."""
+    align_path = out_dir + '/align.txt'
+    if not os.path.exists(align_path):
+        parameter_object = itk.ParameterObject.New()
+        alignment_files = check_files(out_dir, stack_range, 'txt')
+        params = np.zeros((len(alignment_files), 3))
+        for i, file in enumerate(alignment_files):
+            params[i] = get_transform_params(file, parameter_object)
+        param_df = pd.DataFrame(params, columns=['theta', 't_x', 't_y'])
+        param_df.to_csv(out_dir + '/params.csv')
+
+        median_params = np.median(param_df.to_numpy(), axis=0)
+        parameter_object.ReadParameterFile('/home/albert_w/scripts/template.txt')
+        changed_param_map = parameter_object.GetParameterMap(0)
+        changed_param_map['TransformParameters'] = [f'{i:.15f}' for i in median_params]
+        parameter_object.SetParameterMap(0, changed_param_map)
+        parameter_object.WriteParameterFile(parameter_object, align_path)
+
+        plt.subplot(311)
+        plt.hist(param_df['theta'], bins=100)
+        plt.axvline(median_params[0], color='k', linestyle='--')  
+        plt.title(r'$\theta$')
+        plt.subplot(312)
+        plt.hist(param_df['t_x'], bins=100)
+        plt.axvline(median_params[1], color='k', linestyle='--')
+        plt.title(r'$t_x$')
+        plt.subplot(313)
+        plt.hist(param_df['t_y'], bins=100)
+        plt.axvline(median_params[2], color='k', linestyle='--')
+        plt.title(r'$t_y$')
+        plt.tight_layout()
+        plt.savefig(out_dir + '/align.png')
+        plt.close()
+
+def write_mip(out_dir, stack_range):
+    """Combines multiple TIF files into a single output file using tifffile."""
+    mip_path = out_dir + '/mip.tif'
+    if not os.path.exists(mip_path):
+        tif_files = check_files(out_dir, stack_range, 'tif')
+        
+        parameter_object = itk.ParameterObject.New()
+        parameter_object.ReadParameterFile(out_dir + '/align.txt')
+        with tifffile.TiffWriter(mip_path, bigtiff=True, imagej=True) as tif:
+            for tif_file in tif_files:
+                stack = tifffile.imread(tif_file)
+                gfp, rfp = np.max(stack, axis=0).astype(np.float32)
+                gfp_reg = itk.transformix_filter(gfp, parameter_object)
+                tif.write(np.stack([gfp_reg, rfp], axis=0).clip(0, 4095).astype(np.uint16), contiguous=True)
+                print(f'{os.path.basename(tif_file)} written to mip.tif')
+
+        mip = tifffile.imread(mip_path)
+        gfp_means, rfp_means = np.mean(mip, axis=(2, 3)).T
+        plt.subplot(211)
+        plt.plot(gfp_means, c='C2')
+        plt.xlim(0, len(mip))
+        plt.title(f'Max GFP mean: index {np.argmax(gfp_means)}')
+        plt.subplot(212)
+        plt.plot(rfp_means, c='C3')
+        plt.xlim(0, len(mip))
+        plt.title(f'Max RFP mean: index {np.argmax(rfp_means)}')
+        plt.tight_layout()
+        plt.savefig(out_dir + '/means.png')
+        plt.close()
+
+def make_rgb(frame, shape=(512, 512, 3)):
+    """Creates an RGB image from a frame."""
+    gfp, rfp = frame
+    rgb = np.zeros(shape, np.ubyte)
+    adjust = lambda frame, lo, hi: np.clip((frame.astype(np.float32) - lo) / (hi - lo), 0, 1)
+    rgb[..., 0] = adjust(rfp, 0, 400) * 255
+    rgb[..., 1] = adjust(gfp, 0, 100) * 255
+    return rgb
+
+def write_mp4(out_dir):
+    """Creates an AVI file from a MIP TIF file."""
+    mp4_path = out_dir + '/mip.mp4'
+    if not os.path.exists(mp4_path):
+        mip = tifffile.imread(out_dir + '/mip.tif')
+        with imageio.get_writer(out_dir + '/mip.mp4', fps=5/0.533) as mp4:
+            for frame in mip:
+                mp4.append_data(make_rgb(frame))
+
+def main():
+    """Main pipeline: create parameter DataFrame, save results."""
+    input_nd2 = sys.argv[1]
+    stack_range = get_range(input_nd2)
+    out_dir = os.path.splitext(input_nd2)[0]
+    
+    check_focus(out_dir, stack_range)
+    write_alignment(out_dir, stack_range)
+    write_mip(out_dir, stack_range)
+    write_mp4(out_dir)
+
+if __name__ == '__main__':
+    main()

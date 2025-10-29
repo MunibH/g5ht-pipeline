@@ -1,0 +1,21 @@
+name: g5ht-pipeline
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.13
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - scikit-image
+  - tifffile
+  - imageio
+  - joblib
+  - nd2reader
+  - pip
+  - pip:
+      - itk-elastix
+      - nd2
+      - dask
+      - tqdm

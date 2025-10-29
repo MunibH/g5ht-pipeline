@@ -1,0 +1,7 @@
+- there's nothing in the .nd2 file metadata that indicates number of z-slices per frame
+    - should be able to get that automatically from somewhere? 
+        - doesn't seem to be saved anywhere
+        - 41 slices per frame
+        - 0.36 um for each timepoint
+- even though we focus in the middle of the worm, the recording starts at the bottom most z-coordinate and moves up 41 slices, then resets, and repeats per frame stack
+- last 2 z-slices are trimmed? 
