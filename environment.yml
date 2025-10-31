@@ -16,6 +16,5 @@ dependencies:
   - pip
   - pip:
       - itk-elastix
-      - nd2
-      - dask
+      - imageio-ffmpeg
       - tqdm

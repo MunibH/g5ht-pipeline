@@ -18,7 +18,7 @@ def get_range(input_nd2, stack_length=41):
 
 def check_focus(out_dir, stack_range):
     """Checks the focus of the recording"""
-    plot_path = out_dir + '/focus.png'
+    plot_path = os.path.join(out_dir, 'focus.png')
     if not os.path.isfile(plot_path):
         tif_files = check_files(out_dir, stack_range, 'tif')
         for i in range(0, len(tif_files), 100):
@@ -33,8 +33,8 @@ def check_focus(out_dir, stack_range):
 
 def check_files(out_dir, stack_range, extension):
     """Checks if all the expected files in the stack range are in the directory"""
-    existing_files = set(glob.glob(out_dir + f'/{extension}/*.{extension}'))
-    expected_files = {out_dir + f'/{extension}/{i:04d}.{extension}' for i in stack_range}
+    existing_files = set(glob.glob(os.path.join(out_dir, f'{extension}',f'*.{extension}')))
+    expected_files = {os.path.join(out_dir, f'{extension}', f'{i:04d}.{extension}') for i in stack_range}
     if missing_files := expected_files - existing_files:
         stacks = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in missing_files])
         raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
@@ -47,7 +47,7 @@ def get_transform_params(file, parameter_object):
 
 def write_alignment(out_dir, stack_range):
     """Creates an alignment file from the parameter DataFrame."""
-    align_path = out_dir + '/align.txt'
+    align_path = os.path.join(out_dir, 'align.txt')
     if not os.path.exists(align_path):
         parameter_object = itk.ParameterObject.New()
         alignment_files = check_files(out_dir, stack_range, 'txt')
@@ -55,10 +55,10 @@ def write_alignment(out_dir, stack_range):
         for i, file in enumerate(alignment_files):
             params[i] = get_transform_params(file, parameter_object)
         param_df = pd.DataFrame(params, columns=['theta', 't_x', 't_y'])
-        param_df.to_csv(out_dir + '/params.csv')
+        param_df.to_csv(os.path.join(out_dir,'params.csv'))
 
         median_params = np.median(param_df.to_numpy(), axis=0)
-        parameter_object.ReadParameterFile('/home/albert_w/scripts/template.txt')
+        parameter_object.ReadParameterFile(os.path.join(r'C:\Users\munib\POSTDOC\CODE\g5ht-pipeline','template.txt'))
         changed_param_map = parameter_object.GetParameterMap(0)
         changed_param_map['TransformParameters'] = [f'{i:.15f}' for i in median_params]
         parameter_object.SetParameterMap(0, changed_param_map)
@@ -77,17 +77,17 @@ def write_alignment(out_dir, stack_range):
         plt.axvline(median_params[2], color='k', linestyle='--')
         plt.title(r'$t_y$')
         plt.tight_layout()
-        plt.savefig(out_dir + '/align.png')
+        plt.savefig(os.path.join(out_dir, 'align.png'))
         plt.close()
 
 def write_mip(out_dir, stack_range):
     """Combines multiple TIF files into a single output file using tifffile."""
-    mip_path = out_dir + '/mip.tif'
+    mip_path = os.path.join(out_dir,  'mip.tif')
     if not os.path.exists(mip_path):
         tif_files = check_files(out_dir, stack_range, 'tif')
         
         parameter_object = itk.ParameterObject.New()
-        parameter_object.ReadParameterFile(out_dir + '/align.txt')
+        parameter_object.ReadParameterFile(os.path.join(out_dir, 'align.txt'))
         with tifffile.TiffWriter(mip_path, bigtiff=True, imagej=True) as tif:
             for tif_file in tif_files:
                 stack = tifffile.imread(tif_file)
@@ -107,7 +107,7 @@ def write_mip(out_dir, stack_range):
         plt.xlim(0, len(mip))
         plt.title(f'Max RFP mean: index {np.argmax(rfp_means)}')
         plt.tight_layout()
-        plt.savefig(out_dir + '/means.png')
+        plt.savefig(os.path.join(out_dir, 'means.png'))
         plt.close()
 
 def make_rgb(frame, shape=(512, 512, 3)):
@@ -121,10 +121,10 @@ def make_rgb(frame, shape=(512, 512, 3)):
 
 def write_mp4(out_dir):
     """Creates an AVI file from a MIP TIF file."""
-    mp4_path = out_dir + '/mip.mp4'
+    mp4_path = os.path.join(out_dir , 'mip.mp4')
     if not os.path.exists(mp4_path):
-        mip = tifffile.imread(out_dir + '/mip.tif')
-        with imageio.get_writer(out_dir + '/mip.mp4', fps=5/0.533) as mp4:
+        mip = tifffile.imread(os.path.join(out_dir, 'mip.tif'))
+        with imageio.get_writer(os.path.join(out_dir, 'mip.mp4'), fps=5/0.533) as mp4:
             for frame in mip:
                 mp4.append_data(make_rgb(frame))
 
