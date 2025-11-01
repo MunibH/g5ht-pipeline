@@ -13,6 +13,8 @@
 ## for preprocess.py
 - noise stack is loaded in `run_pipeline.ipynb` rather than in `preprocess.py`
 - parallelize rather than submit a job per frame
+- crosstalk???
+- define a baseline? 
 
 ## for preprocess_array.sh and submit_preprocess.sh
 - need to figure out QOSMaxCpuPerUserLimit and how job arrays and cpus-per-task fit in
