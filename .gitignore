@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+*/SCRATCH/
+/SCRATCH/
+SCRATCH/
+
+*.tif
+*.mp4
+*.avi
+*.mov
+*.mp3
+*.csv
+*.mat
+*.npy
+*.xlsx
+*.h5
+*.hdf5
+*.png
+*.jpg
+*.svg
+*.gif
