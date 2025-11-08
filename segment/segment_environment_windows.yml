@@ -1,0 +1,21 @@
+name: segment
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - tifffile
+  - joblib
+  - matplotlib
+  - scikit-image
+  - imageio
+  - pip
+  - pip:
+    - tensorflow[and-cuda]
+    - tensorflow-text
+    - keras
+    - keras-hub
+    - imageio-ffmpeg
+    - tqdm

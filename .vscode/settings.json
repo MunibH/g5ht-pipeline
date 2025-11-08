@@ -1,5 +1,12 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "workbench.colorCustomizations": {
+        "[Solarized Light]": {
+            "editor.selectionBackground": "#fbbf6a",
+            "editor.selectionForeground": "#000000",
+            "editor.lineHighlightBackground": "#edebe4"
+        }
+    }
 }
