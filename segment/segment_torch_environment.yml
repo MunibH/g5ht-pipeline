@@ -1,0 +1,27 @@
+name: segment-torch
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  # Using Python 3.11 for better stability with this version of PyTorch
+  - python=3.11
+  # Downgraded PyTorch and TorchVision versions
+  - pytorch=2.3
+  - torchvision=0.18
+  # Matches the chosen stable PyTorch/TorchVision version
+  - pytorch-cuda=11.8
+  - numpy
+  - scipy
+  - tifffile
+  - matplotlib
+  - scikit-image
+  - imageio
+  - tensorboard
+  - tqdm
+  - pip
+  - pip:
+    - segmentation-models-pytorch
+    - timm
+    - imageio-ffmpeg

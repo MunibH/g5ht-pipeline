@@ -3,15 +3,19 @@
 ### CLONE REPOSITORY
 `git clone [repo url]`
 
-### CREATING CONDA ENVIRONMENT
+### CREATING CONDA ENVIRONMENTS
 
 Assuming you already have anaconda/miniconda/miniforge installed...
 
 #### On MIT's engaging cluster
 -  `module load miniforge`
 -  `conda create env -f environment.yml`
+    - created `g5ht-pipeline` environment, used for all steps other than segmentation
+-  `conda create env -f segment/segment_torch_environment.yml` or `segment/segment_environment.yml`
+    - creates `segment-torch` or `eval` conda environments, used for segmentation
 #### On local PC
 -  `conda create env -f environment.yml`
+
 
 # STEPS
 ## 1. PREPROCESS DATA
@@ -74,6 +78,33 @@ __JUST PROCESS ONE EXPERIMENT__
 
 - in same output subdirectory from step1:
     - saves `align.png`, `align.txt`, `focus.png`, `means.png`, `mip.mp4`, `mip.tif`
+
+## 3. SEGMENTATION
+
+Uses a deeplabv3p_resnet50 network to segement the worm's body from background. 
+
+There are multiple ways you can do this on Engaging. The pytorch framework is newer, and I mostly wrote it since it's the only way I could get something to work on a local windows pc.
+The two frameworks perform identically, so up to you which one you want to use.
+
+__WITH PYTORCH FRAMEWORK__
+1. install `segement-torch` conda environment (see above)
+2. make a text file with each line containing the fullfile to a .nd2 that needs segmentation (`mip.tif` is the thing that will be used for segmentation)
+    - see `datasets_to_segment.txt` as an example
+3. change `LIST_FILE` in `batch_segment_torch.sh` to the fullfile to the text file of datasets to preprocess
+4. change paths in `batch_segment_torch.sh` and `segment_torch.sh`
+5. in `segment_torch.py` update the `CHECKPOINT` variable file path to your `.pth` weights file:
+6. Run `sbatch /home/munib/CODE/g5ht-pipeline/segment/batch_segment_torch.sh`
+   - alternatively, can directly call `sbatch /home/munib/CODE/g5ht-pipeline/segment/segment_torch.sh "pth/to/mip/"`
+
+__WITH TENSORFLOW FRAMEWORK__
+
+TODO
+
+#### OUTPUTS
+
+- in same output subdirectory from step1:
+    - saves `label.tif`, containing a mask for each frame
+
 
 # TODO
 - `noise_path` in `preprocess.py` should be pulled out and put in `batch_all_processes.sh`
