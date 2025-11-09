@@ -1,1 +1,1 @@
-/orcd/data/flavell/001/g5ht/DATA/20251103/date-20251103_time-0900_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001.nd2
