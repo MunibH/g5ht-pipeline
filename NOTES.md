@@ -6,7 +6,6 @@
 - even though we focus in the middle of the worm, the recording starts at the bottom most z-coordinate and moves up 41 slices, then resets, and repeats per frame stack
 - last 2 z-slices are trimmed? 
     - piezo starts moving back up at 39 frames, so it's not clear where those z-slices are taken in space
-- in preprocess.sh, $SLURM_ARRAY_TASK_ID must be the frame index??? but --array is 0-200, shouldn't there be 1200 IDs
 
 
 # TODO

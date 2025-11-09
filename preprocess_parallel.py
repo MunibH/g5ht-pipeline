@@ -62,8 +62,8 @@ def align_channels(stack, parameter_object):
 
 def process_one(index, input_nd2, noise_stack, out_dir):
     """Process a single frame index (shear correction + channel alignment)."""
-    tif_path = os.path.join(out_dir, "tif_parallel", f"{index:04d}.tif")
-    txt_path = os.path.join(out_dir, "txt_parallel", f"{index:04d}.txt")
+    tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
+    txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
 
     # --- shear correction ---
     if not os.path.exists(tif_path):
@@ -102,8 +102,8 @@ def main():
     n_workers = int(sys.argv[5]) if len(sys.argv) > 5 else cpu_count()
 
     out_dir = os.path.splitext(input_nd2)[0]
-    os.makedirs(os.path.join(out_dir, "tif_parallel"), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, "txt_parallel"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "txt"), exist_ok=True)
 
     noise_stack = get_noise_stack(noise_pth)
 
