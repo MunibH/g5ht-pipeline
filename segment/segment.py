@@ -19,7 +19,7 @@ def make_label_batch(model, tensor_batch):
     labels = model.predict(tensor_batch)
     return np.argmax(labels, axis=3)
 
-def main():
+if __name__ == '__main__':
 
     #load model
     model = keras_hub.models.ImageSegmenter.from_preset('deeplab_v3_plus_resnet50_pascalvoc', num_classes=2, compile=False)
