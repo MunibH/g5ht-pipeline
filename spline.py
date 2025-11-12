@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 import json
 import tqdm
+import sys
+import os
 
 r_dilation = 8
 r_erosion = 32
@@ -55,8 +57,9 @@ def visualize_frame(seg, nodes, spline_dilation=4):
 
 def main():
 
+    label_path = sys.argv[1]
     #reads label
-    label = tif.imread('mip_label.tif')
+    label = tif.imread(label_path)
 
     #initializes outputs
     dilated_label = np.zeros(label.shape, np.bool)
@@ -80,5 +83,3 @@ def main():
     with open('spline.json', 'w') as f:
         json.dump(spline_dict, f, indent=4)
 
-if __name__ == '__main__':
-    main()
