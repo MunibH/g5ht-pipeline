@@ -1,0 +1,11 @@
+# just follow these steps:
+
+conda create -n torchcu129 python=3.12 pip -y
+conda activate torchcu129
+
+pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu129
+
+
+pip install numpy scipy matplotlib scikit-image tifffile imageio tensorboard tqdm pillow jupyter ipykernel segmentation-models-pytorch timm imageio-ffmpeg
+
+python -m ipykernel install --user --name torchcu129 --display-name "torchcu129"
