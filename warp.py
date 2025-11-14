@@ -47,15 +47,17 @@ def mask_warp(mask, form):
 # load spline pts and initialize transform
 def main():
     out_dir, index = sys.argv[1], int(sys.argv[2])
-    with open(out_dir + '/followed.json', 'r') as f:
+    with open(os.path.join(out_dir , 'oriented.json'), 'r') as f:
         spline_dict = json.load(f)
     spline_dict = {int(k): v for k, v in spline_dict.items()}
     spline_data = np.array(spline_dict[index])
     tform = initialize_tform(spline_data)
-    print('Done initalizing transform!')
+    # print('Done initalizing transform!')
 
     # load stack and warp in parallel
-    stack = tifffile.imread(f'{out_dir}/tif/{index:04d}.tif').astype(np.float32)
+    stack_pth = os.path.join(out_dir,'tif',f'{index:04d}.tif')
+    stack = tifffile.imread(stack_pth).astype(np.float32)
+
     def slice_warp(index):
         frame = stack[index]
         warp = lambda chn_frame: transform.warp(chn_frame, tform, output_shape=(200, 500), preserve_range=True, order=3)
@@ -63,17 +65,15 @@ def main():
         return np.clip(out, 0, 4095).astype(np.uint16)
     warped = Parallel(n_jobs=-1)(delayed(slice_warp)(i) for i in range(len(stack)))
     warped = np.array(warped)
-    os.makedirs(out_dir + '/warped', exist_ok=True)
-    tifffile.imwrite(f'{out_dir}/warped/{index:04d}.tif', warped, imagej=True)
-    print('Done warping stack!')
+    os.makedirs(os.path.join(out_dir, 'warped'), exist_ok=True)
+    warped_tif_fn =  os.path.join(out_dir,'warped',f'{index:04d}.tif')
+    tifffile.imwrite(warped_tif_fn, warped, imagej=True)
+    # print('Done warping stack!')
 
     # load mask and warp
-    dilated = tifffile.imread(f'{out_dir}/dilated.tif')
+    dilated = tifffile.imread(os.path.join(out_dir, 'dilated.tif'))
     mask = dilated[index]
     warped_mask = transform.warp(mask, tform, output_shape=(200, 500), order=0)
-    os.makedirs(out_dir + '/masks', exist_ok=True)
-    tifffile.imwrite(f'{out_dir}/masks/{index:04d}.tif', warped_mask)
-    print('Done warping mask!')
-
-if __name__ == '__main__':
-    main()
+    os.makedirs(os.path.join(out_dir, 'masks'), exist_ok=True)
+    tifffile.imwrite(os.path.join(out_dir, 'masks', f'{index:04d}.tif'), warped_mask)
+    # print('Done warping mask!')

@@ -40,29 +40,29 @@ def register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack):
 #check if output already exists
 def main():
 	input_dir, index = sys.argv[1], int(sys.argv[2])
-	os.makedirs(input_dir + '/registered', exist_ok=True)
-	output_path = f'{input_dir}/registered/{index:04d}.tif'
+	registered_pth = os.path.join(input_dir,'registered')
+	warped_pth = os.path.join(input_dir,'warped')
+
+	os.makedirs(registered_pth, exist_ok=True)
+	output_path = os.path.join(registered_pth,f'{index:04d}.tif')
 	if os.path.isfile(output_path):
 		raise FileExistsError(f'Stack {index} already registered!')
 
 	#load stacks
-	moving_path = f'{input_dir}/warped/{index:04d}.tif'
+	moving_path = os.path.join(warped_pth,f'{index:04d}.tif')
 	moving_stack = tifffile.imread(moving_path).astype(np.float32)
 	moving_stack = ndi.zoom(moving_stack, zoom=(3, 1, 1, 1))
-	fixed_stack = tifffile.imread(input_dir + '/fixed.tif').astype(np.float32)
+	fixed_stack = tifffile.imread(os.path.join(input_dir, 'fixed.tif')).astype(np.float32)
 	fixed_stack = ndi.zoom(fixed_stack, zoom=(3, 1, 1, 1))
 
-	fixed_mask = tifffile.imread(input_dir + '/fixed_mask.tif')
+	fixed_mask = tifffile.imread(os.path.join(input_dir, 'fixed_mask.tif')) # should this be a fixed mask
 	fixed_mask_stack = np.stack([fixed_mask] * 117)
 
-	moving_mask_path = f'{input_dir}/masks/{index:04d}.tif'
+	moving_mask_path = os.path.join(input_dir, 'masks', f'{index:04d}.tif')
 	moving_mask = tifffile.imread(moving_mask_path)
 	moving_mask_stack = np.stack([moving_mask] * 117)
 	
 	#register and save
 	output_stack = register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
 	tifffile.imwrite(output_path, output_stack, imagej=True)
-	print(f'Registered stack {index}!')
-
-if __name__ == '__main__':
-	main()
+	# print(f'Registered stack {index}!')

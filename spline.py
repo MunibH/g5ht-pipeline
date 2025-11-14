@@ -57,9 +57,11 @@ def visualize_frame(seg, nodes, spline_dilation=4):
 
 def main():
 
-    label_path = sys.argv[1]
+    fullfile_label  = sys.argv[1]
+    label_path = os.path.dirname(fullfile_label)
+
     #reads label
-    label = tif.imread(label_path)
+    label = tif.imread(fullfile_label)
 
     #initializes outputs
     dilated_label = np.zeros(label.shape, np.bool)
@@ -78,8 +80,8 @@ def main():
         spline_dict[i] = nodes
 
     #saves outputs
-    tif.imwrite('dilated.tif', dilated_label)
-    tif.imwrite('visual.tif', visualization)
-    with open('spline.json', 'w') as f:
+    tif.imwrite(os.path.join(label_path, 'dilated.tif'), dilated_label)
+    tif.imwrite(os.path.join(label_path, 'spline.tif'), visualization)
+    with open(os.path.join(label_path, 'spline.json'), 'w') as f:
         json.dump(spline_dict, f, indent=4)
 
