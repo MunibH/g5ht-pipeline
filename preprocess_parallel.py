@@ -99,7 +99,8 @@ def main():
     start_idx = int(sys.argv[2])
     end_idx = int(sys.argv[3])
     noise_pth = sys.argv[4]
-    n_workers = int(sys.argv[5]) if len(sys.argv) > 5 else cpu_count()
+    stack_length = int(sys.argv[5]) if len(sys.argv) > 5 else 41
+    n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
 
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)

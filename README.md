@@ -6,3 +6,9 @@
 5. orient
 6. warp.py
 7. reg.py
+8. 
+# TODO
+- auto or manual pick fixed frame and mask, save which ones used
+- save input to orient.py (approximate pixel location of nose)
+- labelme, label rois, quantify.py
+- heatmap of each voxel over time, cluster?? to find ROIs
