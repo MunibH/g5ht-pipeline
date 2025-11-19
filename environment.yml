@@ -18,3 +18,6 @@ dependencies:
       - itk-elastix
       - imageio-ffmpeg
       - tqdm
+      - h5py
+      - hdf5plugin
+

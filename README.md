@@ -6,7 +6,8 @@
 5. orient
 6. warp.py
 7. reg.py
-8. 
+8. labelme/roi.tif
+9. quantify.py
 # TODO
 - auto or manual pick fixed frame and mask, save which ones used
 - save input to orient.py (approximate pixel location of nose)
