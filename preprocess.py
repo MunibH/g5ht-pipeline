@@ -14,13 +14,22 @@ from utils import get_noise_stack
 
 def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim=2):
     """Extracts and preprocesses a specific stack from the ND2 file, returns float32 array with trimmed z-slices."""
+
+    if stack_shape[0]==1:
+        noise_stack = np.mean(noise_stack,axis=0)
+        noise_stack = noise_stack[np.newaxis,:,:,:]
+
     stack = np.zeros(stack_shape, np.float32)
     frame_indices = np.arange(stack_shape[0] * index, stack_shape[0] * (index + 1))
     with ND2Reader(input_nd2) as f:
         for i, j in enumerate(frame_indices):
             stack[i] = f.get_frame_2D(0, j), f.get_frame_2D(1, j)
     denoised = np.clip(stack - noise_stack, 0, 4095)
-    return denoised[:-trim]
+
+    if stack_shape[0]==1:
+        return denoised
+    else:
+        return denoised[:-trim]
 
 def register(fixed, moving, parameter_object, threads=8):
     """Performs rigid registration between two images using ITK's elastix with binary masks."""
@@ -57,7 +66,14 @@ def align_channels(stack, parameter_object):
 
 def main():
     """Main pipeline: load/create shear-corrected stack, perform channel alignment, save parameters."""
-    input_nd2, index, noise_pth = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+
+    input_nd2 = sys.argv[1]
+    index = int(sys.argv[2])
+    noise_pth = sys.argv[3]
+    stack_length = int(sys.argv[4])
+    num_frames, height, width, num_channels = int(sys.argv[5]), int(sys.argv[6]), int(sys.argv[7]), int(sys.argv[8])
+    stack_shape = (stack_length,num_channels,height,width)
+
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(out_dir + '/tif', exist_ok=True) 
     os.makedirs(out_dir + '/txt', exist_ok=True) 
@@ -69,11 +85,11 @@ def main():
         shear_correct_parameter_object = itk.ParameterObject.New()
         shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
         shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
-        stack = get_stack(input_nd2, index, noise_stack)
+        stack = get_stack(input_nd2, index, noise_stack, stack_shape=stack_shape)
         shear_corrected = shear_correct(stack, shear_correct_parameter_object)
         shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
         tifffile.imwrite(tif_path, shear_corrected, imagej=True)
-        print(f'Stack {index:04d} shear corrected')
+        # print(f'Stack {index:04d} shear corrected')
 
     txt_path = out_dir + f'/txt/{index:04d}.txt'
     if not os.path.exists(txt_path):
@@ -81,9 +97,11 @@ def main():
         channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
         channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
         shear_corrected = tifffile.imread(tif_path).astype(np.float32)
+        if stack_shape[0]==1:
+            shear_corrected = shear_corrected[np.newaxis,:,:,:]
         params = align_channels(shear_corrected, channel_align_parameter_object)
         params.WriteParameterFile(params, txt_path)
-        print(f'Stack {index:04d} aligned')
+        # print(f'Stack {index:04d} aligned')
 
 if __name__ == '__main__':
     main()

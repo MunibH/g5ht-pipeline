@@ -14,8 +14,11 @@ def get_noise_stack(noise_path, stack_length=41):
 def get_range_from_nd2(input_nd2, stack_length=41):
     """Returns a range object containing valid stack indices from the ND2 file."""
     with ND2Reader(input_nd2) as f:
-        stack_range = range(f.metadata['num_frames'] // stack_length)
-    return stack_range
+        num_frames = (f.metadata['num_frames'] // stack_length)
+        height = f.metadata['height']
+        width = f.metadata['width']
+        num_channels = len(f.metadata['channels'])
+    return num_frames, height, width, num_channels
 
 def get_stack_from_nd2(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim=2, denoise=True, make_third_channel=False):
     """Extracts and preprocesses a specific stack from the ND2 file, returns float32 array with trimmed z-slices.

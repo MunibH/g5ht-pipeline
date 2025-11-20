@@ -10,6 +10,14 @@ import matplotlib.pyplot as plt
 import itk
 import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
 
+def extract_frame_from_path(path):
+    # get the basename (filename with extension): '13845.tif'
+    filename_with_ext = os.path.basename(path)
+    filename_without_ext = os.path.splitext(filename_with_ext)[0]
+    # convert the resulting string to an integer for numerical sorting
+    # this step is needed for sorting '0837' correctly before '1675', etc.
+    return int(filename_without_ext)
+
 def get_range(input_nd2, stack_length=41):
     """Returns a range object containing valid stack indices from the ND2 file."""
     with ND2Reader(input_nd2) as f:
@@ -23,10 +31,12 @@ def check_focus(out_dir, stack_range):
         tif_files = check_files(out_dir, stack_range, 'tif')
         for i in range(0, len(tif_files), 100):
             stack = tifffile.imread(tif_files[i])
+            if len(stack.shape)==3: # 1 z slice
+                stack = stack[np.newaxis,:,:,:]
             rfp = stack[:, 1]
             color = plt.cm.viridis(i / len(tif_files))
             plt.plot(np.mean(rfp, axis=(1, 2)), color=color)
-        plt.xlim(0, 38)
+        plt.xlim(0, stack.shape[0])
         plt.tight_layout()
         plt.savefig(plot_path)
         plt.close()
@@ -38,7 +48,8 @@ def check_files(out_dir, stack_range, extension):
     if missing_files := expected_files - existing_files:
         stacks = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in missing_files])
         raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
-    return sorted(expected_files)
+
+    return sorted(expected_files, key=extract_frame_from_path)
 
 def get_transform_params(file, parameter_object):
     """Extracts transform parameters from a text file."""
@@ -85,12 +96,14 @@ def write_mip(out_dir, stack_range):
     mip_path = os.path.join(out_dir,  'mip.tif')
     if not os.path.exists(mip_path):
         tif_files = check_files(out_dir, stack_range, 'tif')
-        
+
         parameter_object = itk.ParameterObject.New()
         parameter_object.ReadParameterFile(os.path.join(out_dir, 'align.txt'))
         with tifffile.TiffWriter(mip_path, bigtiff=True, imagej=True) as tif:
             for tif_file in tif_files:
                 stack = tifffile.imread(tif_file)
+                if len(stack.shape)==3:
+                    stack = stack[np.newaxis,:,:,:]
                 gfp, rfp = np.max(stack, axis=0).astype(np.float32)
                 gfp_reg = itk.transformix_filter(gfp, parameter_object)
                 tif.write(np.stack([gfp_reg, rfp], axis=0).clip(0, 4095).astype(np.uint16), contiguous=True)
@@ -119,25 +132,28 @@ def make_rgb(frame, shape=(512, 512, 3)):
     rgb[..., 1] = adjust(gfp, 0, 100) * 255
     return rgb
 
-def write_mp4(out_dir):
+def write_mp4(out_dir, fps=5/0.533):
     """Creates an AVI file from a MIP TIF file."""
     mp4_path = os.path.join(out_dir , 'mip.mp4')
-    if not os.path.exists(mp4_path):
-        mip = tifffile.imread(os.path.join(out_dir, 'mip.tif'))
-        with imageio.get_writer(os.path.join(out_dir, 'mip.mp4'), fps=5/0.533) as mp4:
-            for frame in mip:
-                mp4.append_data(make_rgb(frame))
+    # if not os.path.exists(mp4_path):
+    mip = tifffile.imread(os.path.join(out_dir, 'mip.tif'))
+    with imageio.get_writer(os.path.join(out_dir, 'mip.mp4'), fps=fps, codec='mjpeg', quality=5, pixelformat='yuvj444p') as mp4:
+        for frame in mip:
+            mp4.append_data(make_rgb(frame))
 
 def main():
     """Main pipeline: create parameter DataFrame, save results."""
     input_nd2 = sys.argv[1]
-    stack_range = get_range(input_nd2)
+    stack_length = sys.argv[2]
+    num_frames = sys.argv[3] 
+    fps = int(sys.argv[4])
+    stack_range = range(num_frames) #get_range(input_nd2, stack_length)
     out_dir = os.path.splitext(input_nd2)[0]
     
-    check_focus(out_dir, stack_range)
-    write_alignment(out_dir, stack_range)
-    write_mip(out_dir, stack_range)
-    write_mp4(out_dir)
+    # check_focus(out_dir, stack_range)
+    # write_alignment(out_dir, stack_range)
+    # write_mip(out_dir, stack_range)
+    write_mp4(out_dir,fps=fps)
 
 if __name__ == '__main__':
     main()

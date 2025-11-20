@@ -19,13 +19,23 @@ import tqdm  # optional, for progress bar
 
 def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim=2):
     """Extracts and preprocesses a specific stack from the ND2 file, returns float32 array with trimmed z-slices."""
+
+    if stack_shape[0]==1:
+        noise_stack = np.mean(noise_stack,axis=0)
+        noise_stack = noise_stack[np.newaxis,:,:,:]
+
     stack = np.zeros(stack_shape, np.float32)
     frame_indices = np.arange(stack_shape[0] * index, stack_shape[0] * (index + 1))
     with ND2Reader(input_nd2) as f:
         for i, j in enumerate(frame_indices):
             stack[i] = f.get_frame_2D(0, j), f.get_frame_2D(1, j)
     denoised = np.clip(stack - noise_stack, 0, 4095)
-    return denoised[:-trim]
+
+    if stack_shape[0]==1:
+        return denoised
+    else:
+        return denoised[:-trim]
+
 
 def register(fixed, moving, parameter_object, threads=8):
     """Performs rigid registration between two images using ITK's elastix with binary masks."""
@@ -60,7 +70,7 @@ def align_channels(stack, parameter_object):
     _, params = register(rfp_fixed, gfp_moving, parameter_object)
     return params
 
-def process_one(index, input_nd2, noise_stack, out_dir):
+def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512)):
     """Process a single frame index (shear correction + channel alignment)."""
     tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
     txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
@@ -71,7 +81,7 @@ def process_one(index, input_nd2, noise_stack, out_dir):
         shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
         shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
 
-        stack = get_stack(input_nd2, index, noise_stack)
+        stack = get_stack(input_nd2, index, noise_stack, stack_shape)
         shear_corrected = shear_correct(stack, shear_correct_parameter_object)
         shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
         tifffile.imwrite(tif_path, shear_corrected, imagej=True)
@@ -99,8 +109,10 @@ def main():
     start_idx = int(sys.argv[2])
     end_idx = int(sys.argv[3])
     noise_pth = sys.argv[4]
-    stack_length = int(sys.argv[5]) if len(sys.argv) > 5 else 41
+    stack_length = int(sys.argv[5])
     n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
+    num_frames, height, widgth, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
+    stack_shape = (stack_length,height,widgth,num_channels)
 
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)
@@ -114,7 +126,7 @@ def main():
 
     with Pool(processes=n_workers) as pool:
         for _ in tqdm.tqdm(pool.imap_unordered(
-                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir),
+                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape),
                 indices),
                 total=len(indices)):
             pass
