@@ -13,3 +13,4 @@
 - save input to orient.py (approximate pixel location of nose)
 - labelme, label rois, quantify.py
 - heatmap of each voxel over time, cluster?? to find ROIs
+- maybe? mask for each z slice
