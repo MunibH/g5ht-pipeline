@@ -37,7 +37,7 @@ def register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack):
 	output_stack = np.zeros((117, 2, 200, 500), np.uint16)
 	output_stack[:, 0] = np.clip(registered_gfp, 0, 4095)
 	output_stack[:, 1] = np.clip(registered_rfp, 0, 4095)
-	return output_stack
+	return output_stack, transform_parameters
 
 def register_munib(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack):
 	 
@@ -344,10 +344,10 @@ def main():
 	moving_mask_stack = np.stack([moving_mask] * 117)
 	
 	#register and save
-	print('Begin registration')
-	# output_stack, transform_params = register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
+	# print('Begin registration')
+	output_stack, transform_params = register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
 	# output_stack, transform_params = register_test(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
-	output_stack, transform_params = register_munib(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
+	# output_stack, transform_params = register_munib(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
 	# output_stack, transform_params = register_simple(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
 	# output_stack, transform_params = register_fast(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack)
 	# output_stack, transform_params = register_without_masks(fixed_stack, moving_stack)
