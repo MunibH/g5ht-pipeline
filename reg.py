@@ -321,7 +321,7 @@ def register_without_masks(fixed_stack, moving_stack):
 #check if output already exists
 def main():
 	input_dir, index = sys.argv[1], int(sys.argv[2])
-	registered_pth = os.path.join(input_dir,'registered_test')
+	registered_pth = os.path.join(input_dir,'registered')
 	warped_pth = os.path.join(input_dir,'warped')
 
 	os.makedirs(registered_pth, exist_ok=True)
