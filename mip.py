@@ -128,8 +128,8 @@ def make_rgb(frame, shape=(512, 512, 3)):
     gfp, rfp = frame
     rgb = np.zeros(shape, np.ubyte)
     adjust = lambda frame, lo, hi: np.clip((frame.astype(np.float32) - lo) / (hi - lo), 0, 1)
-    rgb[..., 0] = adjust(rfp, 0, 400) * 255
-    rgb[..., 1] = adjust(gfp, 0, 100) * 255
+    rgb[..., 0] = adjust(rfp, 0, 500) * 255
+    rgb[..., 1] = adjust(gfp, 0, 200) * 255
     return rgb
 
 def write_mp4(out_dir, fps=5/0.533):
@@ -150,9 +150,9 @@ def main():
     stack_range = range(num_frames) #get_range(input_nd2, stack_length)
     out_dir = os.path.splitext(input_nd2)[0]
     
-    # check_focus(out_dir, stack_range)
-    # write_alignment(out_dir, stack_range)
-    # write_mip(out_dir, stack_range)
+    check_focus(out_dir, stack_range)
+    write_alignment(out_dir, stack_range)
+    write_mip(out_dir, stack_range)
     write_mp4(out_dir,fps=fps)
 
 if __name__ == '__main__':

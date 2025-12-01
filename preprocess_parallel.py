@@ -23,6 +23,9 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
     if stack_shape[0]==1:
         noise_stack = np.mean(noise_stack,axis=0)
         noise_stack = noise_stack[np.newaxis,:,:,:]
+    elif stack_shape[0] != 41:
+        noise_stack = np.mean(noise_stack,axis=0)
+        noise_stack = noise_stack[np.newaxis,:,:,:]
 
     stack = np.zeros(stack_shape, np.float32)
     frame_indices = np.arange(stack_shape[0] * index, stack_shape[0] * (index + 1))
@@ -112,7 +115,7 @@ def main():
     stack_length = int(sys.argv[5])
     n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
     num_frames, height, widgth, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
-    stack_shape = (stack_length,height,widgth,num_channels)
+    stack_shape = (stack_length,num_channels,height,widgth)
 
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)

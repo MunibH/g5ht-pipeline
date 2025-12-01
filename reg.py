@@ -34,7 +34,7 @@ def register(fixed_stack, fixed_mask_stack, moving_stack, moving_mask_stack):
 	registered_gfp = itk.transformix_filter(moving_gfp, transform_parameters)
 
 	#initialize and fill output
-	output_stack = np.zeros((117, 2, 200, 500), np.uint16)
+	output_stack = np.zeros((fixed_stack.shape[0], 2, 200, 500), np.uint16)
 	output_stack[:, 0] = np.clip(registered_gfp, 0, 4095)
 	output_stack[:, 1] = np.clip(registered_rfp, 0, 4095)
 	return output_stack, transform_parameters
@@ -320,8 +320,9 @@ def register_without_masks(fixed_stack, moving_stack):
 
 #check if output already exists
 def main():
-	input_dir, index = sys.argv[1], int(sys.argv[2])
-	registered_pth = os.path.join(input_dir,'registered')
+	input_dir, index, zoom = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+	registered_pth = os.path.join(input_dir,'registered_zoom')
+	# registered_pth = os.path.join(input_dir,'registered')
 	warped_pth = os.path.join(input_dir,'warped')
 
 	os.makedirs(registered_pth, exist_ok=True)
@@ -332,16 +333,16 @@ def main():
 	#load stacks
 	moving_path = os.path.join(warped_pth,f'{index:04d}.tif')
 	moving_stack = tifffile.imread(moving_path).astype(np.float32)
-	moving_stack = ndi.zoom(moving_stack, zoom=(3, 1, 1, 1))
+	moving_stack = ndi.zoom(moving_stack, zoom=(zoom, 1, 1, 1))
 	fixed_stack = tifffile.imread(os.path.join(input_dir, 'fixed.tif')).astype(np.float32)
-	fixed_stack = ndi.zoom(fixed_stack, zoom=(3, 1, 1, 1))
+	fixed_stack = ndi.zoom(fixed_stack, zoom=(zoom, 1, 1, 1))
 
 	fixed_mask = tifffile.imread(os.path.join(input_dir, 'fixed_mask.tif'))
-	fixed_mask_stack = np.stack([fixed_mask] * 117)
+	fixed_mask_stack = np.stack([fixed_mask] * fixed_stack.shape[0])
 
 	moving_mask_path = os.path.join(input_dir, 'masks', f'{index:04d}.tif')
 	moving_mask = tifffile.imread(moving_mask_path)
-	moving_mask_stack = np.stack([moving_mask] * 117)
+	moving_mask_stack = np.stack([moving_mask] * fixed_stack.shape[0])
 	
 	#register and save
 	# print('Begin registration')
