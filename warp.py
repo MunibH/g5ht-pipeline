@@ -63,6 +63,7 @@ def main():
         warp = lambda chn_frame: transform.warp(chn_frame, tform, output_shape=(200, 500), preserve_range=True, order=3)
         out = np.array((warp(frame[0]), warp(frame[1])))
         return np.clip(out, 0, 4095).astype(np.uint16)
+    # warped = [slice_warp(i) for i in range(len(stack))] % serial
     warped = Parallel(n_jobs=-1)(delayed(slice_warp)(i) for i in range(len(stack)))
     warped = np.array(warped)
     os.makedirs(os.path.join(out_dir, 'warped'), exist_ok=True)

@@ -8,11 +8,6 @@ import warnings; warnings.filterwarnings('ignore', category=UserWarning, module=
 
 from utils import get_noise_stack
 
-from multiprocessing import Pool, cpu_count
-from functools import partial
-import tqdm  # optional, for progress bar
-
-
 # noise_path = '/home/albert_w/scripts/noise_042925.tif'
 # noise_tif = tifffile.imread(noise_path)
 # noise_stack = np.stack([noise_tif] * 41, axis=0).astype(np.float32)
@@ -38,7 +33,6 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
         return denoised
     else:
         return denoised[:-trim]
-
 
 def register(fixed, moving, parameter_object, threads=8):
     """Performs rigid registration between two images using ITK's elastix with binary masks."""
@@ -73,69 +67,46 @@ def align_channels(stack, parameter_object):
     _, params = register(rfp_fixed, gfp_moving, parameter_object)
     return params
 
-def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512)):
-    """Process a single frame index (shear correction + channel alignment)."""
-    tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
-    txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
-
-    # --- shear correction ---
-    if not os.path.exists(tif_path):
-        shear_correct_parameter_object = itk.ParameterObject.New()
-        shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
-        shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
-
-        stack = get_stack(input_nd2, index, noise_stack, stack_shape)
-        shear_corrected = shear_correct(stack, shear_correct_parameter_object)
-        shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
-        tifffile.imwrite(tif_path, shear_corrected, imagej=True)
-        print(f"[{index:04d}] shear corrected")
-
-    # --- channel alignment ---
-    if not os.path.exists(txt_path):
-        channel_align_parameter_object = itk.ParameterObject.New()
-        channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
-        channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
-
-        shear_corrected = tifffile.imread(tif_path).astype(np.float32)
-        params = align_channels(shear_corrected, channel_align_parameter_object)
-        params.WriteParameterFile(params, txt_path)
-        print(f"[{index:04d}] aligned")
-
-
 def main():
-    """
-    Main pipeline: process multiple frame indices in parallel.
-    Usage:
-        python preprocess.py <input_nd2> <start_index> <end_index> <noise_path> [n_workers]
-    """
+    """Main pipeline: load/create shear-corrected stack, perform channel alignment, save parameters."""
+
     input_nd2 = sys.argv[1]
-    start_idx = int(sys.argv[2])
-    end_idx = int(sys.argv[3])
-    noise_pth = sys.argv[4]
-    stack_length = int(sys.argv[5])
-    n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
-    num_frames, height, widgth, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
-    stack_shape = (stack_length,num_channels,height,widgth)
+    index = int(sys.argv[2])
+    noise_pth = sys.argv[3]
+    stack_length = int(sys.argv[4])
+    num_frames, height, width, num_channels = int(sys.argv[5]), int(sys.argv[6]), int(sys.argv[7]), int(sys.argv[8])
+    stack_shape = (stack_length,num_channels,height,width)
 
     out_dir = os.path.splitext(input_nd2)[0]
-    os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)
-    os.makedirs(os.path.join(out_dir, "txt"), exist_ok=True)
-
+    os.makedirs(os.path.join(out_dir, 'tif_test'), exist_ok=True) 
+    os.makedirs(os.path.join(out_dir, 'txt_test'), exist_ok=True) 
+    
     noise_stack = get_noise_stack(noise_pth)
 
-    # --- prepare parallel job list ---
-    indices = list(range(start_idx, end_idx + 1))
-    print(f"Processing {len(indices)} stacks ({start_idx}-{end_idx}) using {n_workers} workers...")
+    tif_path = os.path.join(out_dir, "tif_test", f"{index:04d}.tif")
 
-    with Pool(processes=n_workers) as pool:
-        for _ in tqdm.tqdm(pool.imap_unordered(
-                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape),
-                indices),
-                total=len(indices)):
-            pass
+    shear_correct_parameter_object = itk.ParameterObject.New()
+    # shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
+    shear_correct_parameter_object.ReadParameterFile(os.path.join(r'C:\Users\munib\POSTDOC\CODE\g5ht-pipeline','parameters_freely_moving_euler.txt'))
+    shear_correct_parameter_object = shear_correct_parameter_object.GetParameterMap(0)
+    # shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
+    stack = get_stack(input_nd2, index, noise_stack, stack_shape=stack_shape)
+    shear_corrected = shear_correct(stack, shear_correct_parameter_object)
+    shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
+    tifffile.imwrite(tif_path, shear_corrected, imagej=True)
+    # print(f'Stack {index:04d} shear corrected')
 
-    print("Parallel preprocessing complete.")
+    # txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
+    # if not os.path.exists(txt_path):
+    #     channel_align_parameter_object = itk.ParameterObject.New()
+    #     channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
+    #     channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
+    #     shear_corrected = tifffile.imread(tif_path).astype(np.float32)
+    #     if stack_shape[0]==1:
+    #         shear_corrected = shear_corrected[np.newaxis,:,:,:]
+    #     params = align_channels(shear_corrected, channel_align_parameter_object)
+    #     params.WriteParameterFile(params, txt_path)
+    #     # print(f'Stack {index:04d} aligned')
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
