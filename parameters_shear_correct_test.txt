@@ -1,0 +1,35 @@
+(Transform "TranslationTransform")
+
+(Metric "AdvancedNormalizedCorrelation")
+(NumberOfHistogramBins 32)
+
+(Interpolator "LinearInterpolator")
+(ResampleInterpolator "FinalBSplineInterpolator")
+(FinalBSplineInterpolationOrder 3)
+
+(Registration "MultiResolutionRegistration")
+(FixedImagePyramid "FixedRecursiveImagePyramid")
+(MovingImagePyramid "MovingRecursiveImagePyramid")
+
+(NumberOfResolutions 3)
+
+(ImageSampler "RandomCoordinate")
+(NewSamplesEveryIteration "true")
+(NumberOfSpatialSamples 2000)
+(CheckNumberOfSamples "true")
+(NumberOfSamplesForExactGradient 4096)
+
+(Optimizer "AdaptiveStochasticGradientDescent")
+(AutomaticParameterEstimation "true")
+(AutomaticScalesEstimation "true")
+
+(MaximumNumberOfIterations 200)
+(MaximumNumberOfSamplingAttempts 8)
+
+(DefaultPixelValue 0)
+
+(UseDirectionCosines "true")
+
+(ResultImageFormat "mhd")
+(WriteResultImage "false")
+(WriteIterationInfo "false")
