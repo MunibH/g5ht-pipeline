@@ -6,6 +6,8 @@ import json
 import sys
 import os
 from joblib import Parallel, delayed
+import itk
+import time
 
 def get_length(tck):
     u_fine = np.linspace(0, 1, 100)
@@ -57,6 +59,17 @@ def main():
     # load stack and warp in parallel
     stack_pth = os.path.join(out_dir,'tif',f'{index:04d}.tif')
     stack = tifffile.imread(stack_pth).astype(np.float32)
+
+    # align channels using median transform paramters across all frames (see mip.py)
+    parameter_object = itk.ParameterObject.New()
+    parameter_object.ReadParameterFile(os.path.join(out_dir, 'align.txt'))
+    # t0 = time.time()
+    # print('Starting alignment')
+    for i in range(stack.shape[0]):
+        stack[i,0,:,:] = itk.transformix_filter(stack[i,0,:,:], parameter_object)
+    # print('Done alignment')
+    # t1 = time.time()
+    # print(f'Alignment time: {t1 - t0} seconds')
 
     def slice_warp(index):
         frame = stack[index]
