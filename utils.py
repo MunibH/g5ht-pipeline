@@ -1,3 +1,5 @@
+# uses g5ht-pipeline conda env
+
 from nd2reader import ND2Reader
 import numpy as np
 import itk
