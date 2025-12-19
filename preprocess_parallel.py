@@ -71,12 +71,16 @@ def align_channels(stack, parameter_object):
     """Aligns GFP to RFP channel using max intensity slices."""
     gfp_moving, rfp_fixed = np.max(stack, axis=0)
     _, params = register(rfp_fixed, gfp_moving, parameter_object)
-    return params
+    for i in range(stack.shape[0]):
+        stack[i,0,:,:] = itk.transformix_filter(stack[i,0,:,:], params)
+    channel_aligned = stack.copy()
+    return channel_aligned, params
 
 def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512)):
     """Process a single frame index (shear correction + channel alignment)."""
     tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
     txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
+    align_path = os.path.join(out_dir, "aligned", f"{index:04d}.tif")
 
     # --- shear correction ---
     if not os.path.exists(tif_path):
@@ -97,10 +101,10 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
         channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
 
         shear_corrected = tifffile.imread(tif_path).astype(np.float32)
-        params = align_channels(shear_corrected, channel_align_parameter_object)
+        channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object)
         params.WriteParameterFile(params, txt_path)
+        tifffile.imwrite(align_path, channel_aligned, imagej=True)
         print(f"[{index:04d}] aligned")
-
 
 def main():
     """
@@ -120,6 +124,7 @@ def main():
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "txt"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "aligned"), exist_ok=True)
 
     noise_stack = get_noise_stack(noise_pth)
 
