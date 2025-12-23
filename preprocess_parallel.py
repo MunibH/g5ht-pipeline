@@ -67,16 +67,19 @@ def shear_correct(stack, parameter_object):
         output[i] = gfp_reg, rfp_reg
     return output
 
-def align_channels(stack, parameter_object):
+def align_channels(stack, parameter_object, save_aligned=False):
     """Aligns GFP to RFP channel using max intensity slices."""
     gfp_moving, rfp_fixed = np.max(stack, axis=0)
     _, params = register(rfp_fixed, gfp_moving, parameter_object)
-    for i in range(stack.shape[0]):
-        stack[i,0,:,:] = itk.transformix_filter(stack[i,0,:,:], params)
-    channel_aligned = stack.copy()
+    if save_aligned:
+        for i in range(stack.shape[0]):
+            stack[i,0,:,:] = itk.transformix_filter(stack[i,0,:,:], params)
+        channel_aligned = stack.copy()
+    else:
+        channel_aligned = None
     return channel_aligned, params
 
-def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512)):
+def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), save_aligned=False):
     """Process a single frame index (shear correction + channel alignment)."""
     tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
     txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
@@ -101,9 +104,10 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
         channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
 
         shear_corrected = tifffile.imread(tif_path).astype(np.float32)
-        channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object)
-        params.WriteParameterFile(params, txt_path)
-        tifffile.imwrite(align_path, channel_aligned, imagej=True)
+        channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object, save_aligned=save_aligned)
+        params.WriteParameterFile(params, txt_path) # save alignment parameters
+        if save_aligned:
+            tifffile.imwrite(align_path, channel_aligned, imagej=True) # save aligned stack
         print(f"[{index:04d}] aligned")
 
 def main():
@@ -120,6 +124,7 @@ def main():
     n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
     num_frames, height, widgth, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,widgth)
+    save_aligned = int(sys.argv[11]) if len(sys.argv) > 11 else False
 
     out_dir = os.path.splitext(input_nd2)[0]
     os.makedirs(os.path.join(out_dir, "tif"), exist_ok=True)
@@ -134,7 +139,7 @@ def main():
 
     with Pool(processes=n_workers) as pool:
         for _ in tqdm.tqdm(pool.imap_unordered(
-                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape),
+                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape, save_aligned=save_aligned),
                 indices),
                 total=len(indices)):
             pass
