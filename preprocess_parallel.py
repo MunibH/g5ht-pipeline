@@ -5,6 +5,9 @@ import sys
 import os
 import tifffile
 import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
+import glob
+import matplotlib.pyplot as plt
+import pandas as pd
 
 from utils import get_noise_stack
 
@@ -38,7 +41,7 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
         return denoised
     else:
         return denoised[:-trim]
-
+    
 
 def register(fixed, moving, parameter_object, threads=8):
     """Performs rigid registration between two images using ITK's elastix with binary masks."""
@@ -91,29 +94,29 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
     align_path = os.path.join(out_dir, "aligned", f"{index:04d}.tif")
 
     # --- shear correction ---
-    if not os.path.exists(tif_path):
-        shear_correct_parameter_object = itk.ParameterObject.New()
-        shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
-        shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
+    # if not os.path.exists(tif_path):
+    shear_correct_parameter_object = itk.ParameterObject.New()
+    shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
+    shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
 
-        stack = get_stack(input_nd2, index, noise_stack, stack_shape)
-        shear_corrected = shear_correct(stack, shear_correct_parameter_object)
-        shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
-        tifffile.imwrite(tif_path, shear_corrected, imagej=True)
-        print(f"[{index:04d}] shear corrected")
+    stack = get_stack(input_nd2, index, noise_stack, stack_shape)
+    shear_corrected = shear_correct(stack, shear_correct_parameter_object)
+    shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
+    tifffile.imwrite(tif_path, shear_corrected, imagej=True)
+    print(f"[{index:04d}] shear corrected")
 
     # --- channel alignment ---
-    if not os.path.exists(txt_path):
-        channel_align_parameter_object = itk.ParameterObject.New()
-        channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
-        channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
+    # if not os.path.exists(txt_path):
+    channel_align_parameter_object = itk.ParameterObject.New()
+    channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
+    channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
 
-        shear_corrected = tifffile.imread(tif_path).astype(np.float32)
+    shear_corrected = tifffile.imread(tif_path).astype(np.float32)
 
-        channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object, out_dir, align_with_beads=align_with_beads)
-        params.WriteParameterFile(params, txt_path) # save alignment parameters
-        tifffile.imwrite(align_path, channel_aligned, imagej=True) # save aligned stack
-        print(f"[{index:04d}] aligned")
+    channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object, out_dir, align_with_beads=align_with_beads)
+    params.WriteParameterFile(params, txt_path) # save alignment parameters
+    tifffile.imwrite(align_path, channel_aligned, imagej=True) # save aligned stack
+    print(f"[{index:04d}] aligned")
 
 def main():
     """

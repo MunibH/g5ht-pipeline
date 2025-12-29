@@ -45,7 +45,8 @@ def get_stack_from_nd2(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 5
     return denoised[:-trim]
 
 def get_stack_z_coordinates(input_nd2, index, stack_shape=(41, 2, 512, 512), trim=2):
-    """get piezo z-coordinates. in g5-ht recordings each z step is 0.36 um and voxels are 0.36 um^3"""
+    """get piezo z-coordinates. in Albert's g5-ht recordings each z step is 1.08 um and voxels are 0.36 um^3
+    The zstep value can be different in Munib's recordings"""
     stack = np.zeros(stack_shape, np.float32)
     frame_indices = np.arange(stack_shape[0] * index, stack_shape[0] * (index + 1))
     with ND2Reader(input_nd2) as f:
@@ -53,3 +54,14 @@ def get_stack_z_coordinates(input_nd2, index, stack_shape=(41, 2, 512, 512), tri
             zcoords = None
             zcoords_um = None
     return zcoords, zcoords_um
+
+def get_beads_alignment_file(input_nd2):
+    """get beads alignment file"""
+    out_dir = os.path.splitext(input_nd2)[0]
+    # check if beads file exists
+    beads_file = os.path.join(out_dir+'_chan_alignment.nd2')
+    if not os.path.exists(beads_file):
+        return None
+    else:
+        return beads_file
+   

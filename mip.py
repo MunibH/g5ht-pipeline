@@ -43,8 +43,8 @@ def check_focus(out_dir, stack_range):
 
 def check_files(out_dir, stack_range, extension):
     """Checks if all the expected files in the stack range are in the directory"""
-    existing_files = set(glob.glob(os.path.join(out_dir, f'{extension}',f'*.{extension}')))
-    expected_files = {os.path.join(out_dir, f'{extension}', f'{i:04d}.{extension}') for i in stack_range}
+    existing_files = set(glob.glob(os.path.join(out_dir, f'*.{extension}')))
+    expected_files = {os.path.join(out_dir, f'{i:04d}.{extension}') for i in stack_range}
     if missing_files := expected_files - existing_files:
         stacks = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in missing_files])
         raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
@@ -95,7 +95,8 @@ def write_mip(out_dir, stack_range):
     """Combines multiple TIF files into a single output file using tifffile."""
     mip_path = os.path.join(out_dir,  'mip.tif')
     if not os.path.exists(mip_path):
-        tif_files = check_files(out_dir, stack_range, 'tif')
+        # tif_files = check_files(os.path.join(out_dir,'tif'), stack_range, 'tif')
+        tif_files = check_files(os.path.join(out_dir,'aligned'), stack_range, 'tif')
 
         parameter_object = itk.ParameterObject.New()
         parameter_object.ReadParameterFile(os.path.join(out_dir, 'align.txt'))
@@ -128,8 +129,8 @@ def make_rgb(frame, shape=(512, 512, 3)):
     gfp, rfp = frame
     rgb = np.zeros(shape, np.ubyte)
     adjust = lambda frame, lo, hi: np.clip((frame.astype(np.float32) - lo) / (hi - lo), 0, 1)
-    rgb[..., 0] = adjust(rfp, 0, 500) * 255
-    rgb[..., 1] = adjust(gfp, 0, 200) * 255
+    rgb[..., 0] = adjust(rfp, 0, 750) * 255
+    rgb[..., 1] = adjust(gfp, 0, 100) * 255
     return rgb
 
 def write_mp4(out_dir, fps=5/0.533):
