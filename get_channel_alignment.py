@@ -40,13 +40,72 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
         return denoised[:-trim]
     
 
-def register(fixed, moving, parameter_object, threads=8):
-    """Performs rigid registration between two images using ITK's elastix with binary masks."""
-    #fixed_mask = itk.image_view_from_array((fixed > 0).astype(np.ubyte))
-    #moving_mask = itk.image_view_from_array((moving > 0).astype(np.ubyte))
-    return itk.elastix_registration_method(fixed, moving, #fixed_mask=fixed_mask, moving_mask=moving_mask,
-                                           parameter_object=parameter_object, number_of_threads=threads)
-                                           #log_to_file=True, log_file_name='test.log', output_directory='.')
+def get_3d_rigid_parameter_object(num_resolutions=3):
+    """Creates an optimized parameter object for 3D rigid registration.
+    
+    Uses EulerTransform which provides 6 degrees of freedom:
+    - 3 rotation angles (Rx, Ry, Rz)
+    - 3 translation components (Tx, Ty, Tz)
+    
+    Args:
+        num_resolutions: Number of multi-resolution pyramid levels (default: 3)
+    
+    Returns:
+        ITK ParameterObject configured for 3D rigid registration
+    """
+    parameter_object = itk.ParameterObject.New()
+    parameter_map = parameter_object.GetDefaultParameterMap('rigid', num_resolutions)
+    
+    # Explicitly set EulerTransform for proper 3D rigid registration
+    parameter_map['Transform'] = ['EulerTransform']
+    
+    # Enable automatic scales estimation for better rotation/translation balance
+    parameter_map['AutomaticScalesEstimation'] = ['true']
+    
+    # Center of rotation initialization at image center
+    # parameter_map['AutomaticTransformInitialization'] = ['true']
+    # parameter_map['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
+    
+    # Optimizer settings for robust convergence
+    parameter_map['MaximumNumberOfIterations'] = ['1024']
+    parameter_map['NumberOfSpatialSamples'] = ['4096']
+    
+    # Use mutual information metric (good for multi-channel alignment)
+    parameter_map['Metric'] = ['AdvancedMattesMutualInformation']
+    
+    # Interpolation
+    parameter_map['Interpolator'] = ['BSplineInterpolator']
+    parameter_map['ResampleInterpolator'] = ['FinalBSplineInterpolator']
+    parameter_map['FinalBSplineInterpolationOrder'] = ['3']
+    
+    parameter_object.AddParameterMap(parameter_map)
+    return parameter_object
+
+
+def register(fixed, moving, parameter_object, threads=8, log_dir=None, index=None):
+    """Performs rigid registration between two images using ITK's elastix."""
+    
+    # Always enable console logging AND file logging if specified
+    if log_dir is not None and index is not None:
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"elastix_log_{index:04d}.txt")
+        return itk.elastix_registration_method(
+            fixed, moving,
+            parameter_object=parameter_object, 
+            number_of_threads=threads,
+            log_to_console=True,  # Enable console too
+            log_to_file=True, 
+            log_file_name=log_file,
+            output_directory=log_dir
+        )
+    else:
+        # Fallback to console logging only
+        return itk.elastix_registration_method(
+            fixed, moving,
+            parameter_object=parameter_object, 
+            number_of_threads=threads,
+            log_to_console=True
+        )
 
 
 def align_channels(stack, parameter_object):
@@ -62,14 +121,57 @@ def align_channels(stack, parameter_object):
 
     return params
 
+def align_channels_3d(stack, parameter_object, log_dir=None, index=None):
+    """Aligns GFP to RFP channel using the entire 3D volume.
+    
+    Args:
+        stack: 4D array of shape (Z, C, H, W) where C=2 (GFP, RFP)
+        parameter_object: ITK elastix parameter object for registration
+        log_dir: Directory to save log files
+        index: Frame index for log filename
+    
+    Returns:
+        params: Registration transform parameters
+    """
+    # Extract 3D volumes for each channel: (Z, H, W)
+    gfp_moving = stack[:, 0, :, :].astype(np.float32)
+    rfp_fixed = stack[:, 1, :, :].astype(np.float32)
+    
+    # # Validate images before registration
+    # print(f"Frame {index}: GFP shape={gfp_moving.shape}, range=[{gfp_moving.min():.1f}, {gfp_moving.max():.1f}]")
+    # print(f"Frame {index}: RFP shape={rfp_fixed.shape}, range=[{rfp_fixed.min():.1f}, {rfp_fixed.max():.1f}]")
+    
+    # Check for issues
+    if np.all(gfp_moving == 0) or np.all(rfp_fixed == 0):
+        raise ValueError(f"Frame {index}: One of the channels is all zeros!")
+    if gfp_moving.shape != rfp_fixed.shape:
+        raise ValueError(f"Frame {index}: Shape mismatch - GFP: {gfp_moving.shape}, RFP: {rfp_fixed.shape}")
+    
+    # Convert to ITK images for 3D registration
+    rfp_fixed_itk = itk.image_view_from_array(rfp_fixed)
+    gfp_moving_itk = itk.image_view_from_array(gfp_moving)
+    
+    print(f"Frame {index}: Starting registration...")
+    # Perform 3D registration with logging
+    _, params = register(rfp_fixed_itk, gfp_moving_itk, parameter_object, 
+                        log_dir=log_dir, index=index)
+    print(f"Frame {index}: Registration complete.")
+
+    return params
+
 def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), align_with_beads=False):
     """Process a single frame index (shear correction + channel alignment)."""
 
-    
+    # Use optimized 3D rigid registration parameters
+    channel_align_parameter_object = get_3d_rigid_parameter_object(num_resolutions=3)
+
+    # Create log directory
+    log_dir = os.path.join(out_dir, "elastix_logs")
+    os.makedirs(log_dir, exist_ok=True)
 
     if align_with_beads:
-        beads_nd2 = os.path.splitext(input_nd2)[0] + '_chan_alignment.nd2'
-        beads_pth = os.path.splitext(input_nd2)[0] + '_chan_alignment'
+        beads_nd2 = input_nd2
+        beads_pth = out_dir
 
         os.makedirs(beads_pth, exist_ok=True)
         txt_pth = os.path.join(beads_pth, "txt")
@@ -80,12 +182,9 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
         stack = get_stack(beads_nd2, index, noise_stack, stack_shape=stack_shape)
         stack = np.clip(stack, 0, 4095).astype(np.float32)
 
-        channel_align_parameter_object = itk.ParameterObject.New()
-        channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
-        channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
-
-        params = align_channels(stack, channel_align_parameter_object)
-        params.WriteParameterFile(params, txt_fn) # save alignment parameters
+        params = align_channels_3d(stack, channel_align_parameter_object, 
+                                   log_dir=log_dir, index=index)
+        params.WriteParameterFile(params, txt_fn)
 
     else:
         shear_correct_pth = os.path.join(out_dir, "shear_corrected")
@@ -93,17 +192,13 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
 
         txt_pth = os.path.join(out_dir,"txt")
         os.makedirs(txt_pth, exist_ok=True)
-        txt_pth =  os.path.join(txt_pth, f"{index:04d}.txt")
-
-        channel_align_parameter_object = itk.ParameterObject.New()
-        channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
-        channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
+        txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
 
         shear_corrected = tifffile.imread(shear_correct_fn).astype(np.float32)
 
-        params = align_channels(shear_corrected, channel_align_parameter_object)
-        params.WriteParameterFile(params, txt_pth) # save alignment parameters
-
+        params = align_channels_3d(shear_corrected, channel_align_parameter_object,
+                                   log_dir=log_dir, index=index)
+        params.WriteParameterFile(params, txt_fn)
 
 def main():
     """
