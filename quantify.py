@@ -34,7 +34,7 @@ def main():
                 out[i, j] = np.sum(stack[:, 0][mask == j + 1]) / denominator
 
     t = np.arange(len(out)) * 0.533 / 60
-    df = pd.DataFrame(out, index=t)
+    # df = pd.DataFrame(out, index=t)
     df = df.interpolate()
     df.to_csv(os.path.join(input_dir, 'quantified.csv'))
 
@@ -72,3 +72,47 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(input_dir , 'roi.png'), dpi=300)
     plt.show()
+
+    # -- separate channels --
+    # out_r = np.zeros((len(tif_paths), 3))
+    # out_r[:] = np.nan
+    # out_g = out_r.copy()
+    # for i in tqdm(range(len(out_r))):
+    #     stack = tifffile.imread(tif_paths[i])
+    #     for j in range(3):
+    #         out_g[i, j] = np.sum(stack[:, 0][mask == j + 1])
+    #         out_r[i, j] = np.sum(stack[:, 1][mask == j + 1])
+
+    # t = np.arange(len(out_r)) * 0.533 / 60
+    # df_r = pd.DataFrame(out_r, index=t)
+    # df_g = pd.DataFrame(out_g, index=t)
+    # df_r = df_r.interpolate()
+    # df_g = df_g.interpolate()
+    # df_r.to_csv(os.path.join(input_dir, 'quantified_red.csv'))
+    # df_g.to_csv(os.path.join(input_dir, 'quantified_green.csv'))
+
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(t, out_r[:, 0] / np.mean(out_r[:60, 0]), label='Dorsal nerve ring')
+    # plt.plot(t, out_r[:, 1] / np.mean(out_r[:60, 1]), label='Ventral nerve ring')
+    # plt.plot(t, out_r[:, 2] / np.mean(out_r[:60, 2]), label='Pharynx')
+    # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
+    # plt.xlabel('Time (min)')
+    # plt.ylabel(r'$F/F_{baseline}$')
+    # plt.xlim(0, np.max(t))
+    # plt.axhline(1, ls='--', c='k', zorder=0)
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(input_dir, 'quantified_red.png'), dpi=300)
+    # plt.show()
+
+    # plt.figure(figsize=(10, 4))
+    # plt.plot(t, out_g[:, 0] / np.mean(out_g[:60, 0]), label='Dorsal nerve ring')
+    # plt.plot(t, out_g[:, 1] / np.mean(out_g[:60, 1]), label='Ventral nerve ring')
+    # plt.plot(t, out_g[:, 2] / np.mean(out_g[:60, 2]), label='Pharynx')
+    # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
+    # plt.xlabel('Time (min)')
+    # plt.ylabel(r'$F/F_{baseline}$')
+    # plt.xlim(0, np.max(t))
+    # plt.axhline(1, ls='--', c='k', zorder=0)
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(input_dir, 'quantified_green.png'), dpi=300)
+    # plt.show()

@@ -36,6 +36,7 @@ def main():
     fullfile_spline  = sys.argv[1]
     spline_path = os.path.dirname(fullfile_spline)
 
+    # last_pt is represented as (y,x)
     last_pt = [np.clip(int(i), 0, 512) for i in sys.argv[2:4]]
 
     #reads spline
@@ -129,7 +130,21 @@ def main():
         
         print(f"Saving TIFF stack to: {output_filename}")
         # Save the stack using tifffile
-        tifffile.imwrite(output_filename, stack_data, compression=1) # compress=1 is ZLIB compression
+        # tifffile.imwrite(output_filename, stack_data, compression=1) # compress=1 is ZLIB compression
+        # tifffile.imwrite(
+        #     output_filename,
+        #     stack_data,
+        #     compression="lzma",
+        # )
+        tifffile.imwrite(
+            output_filename,
+            stack_data,
+            photometric="rgb",
+            compression="deflate",
+            compressionargs={"level": 9},  # max deflate
+        )
+
+
         print("TIFF stack saved successfully.")
     else:
         print("No frames were generated.")

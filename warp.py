@@ -6,6 +6,8 @@ import json
 import sys
 import os
 from joblib import Parallel, delayed
+import itk
+import time
 
 def get_length(tck):
     u_fine = np.linspace(0, 1, 100)
@@ -55,7 +57,7 @@ def main():
     # print('Done initalizing transform!')
 
     # load stack and warp in parallel
-    stack_pth = os.path.join(out_dir,'tif',f'{index:04d}.tif')
+    stack_pth = os.path.join(out_dir,'channel_aligned',f'{index:04d}.tif')
     stack = tifffile.imread(stack_pth).astype(np.float32)
 
     def slice_warp(index):

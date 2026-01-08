@@ -65,7 +65,11 @@ def align_channels(stack, parameter_object):
     """Aligns GFP to RFP channel using max intensity slices."""
     gfp_moving, rfp_fixed = np.max(stack, axis=0)
     _, params = register(rfp_fixed, gfp_moving, parameter_object)
-    return params
+
+    for i in range(stack.shape[0]):
+        stack[i,0,:,:] = itk.transformix_filter(stack[i,0,:,:], params)
+    channel_aligned = stack.copy()
+    return channel_aligned, params
 
 def main():
     """Main pipeline: load/create shear-corrected stack, perform channel alignment, save parameters."""
@@ -84,27 +88,31 @@ def main():
     noise_stack = get_noise_stack(noise_pth)
 
     tif_path = os.path.join(out_dir, "tif", f"{index:04d}.tif")
-    if not os.path.exists(tif_path):
-        shear_correct_parameter_object = itk.ParameterObject.New()
-        shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
-        shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
-        stack = get_stack(input_nd2, index, noise_stack, stack_shape=stack_shape)
-        shear_corrected = shear_correct(stack, shear_correct_parameter_object)
-        shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
-        tifffile.imwrite(tif_path, shear_corrected, imagej=True)
-        # print(f'Stack {index:04d} shear corrected')
-
     txt_path = os.path.join(out_dir, "txt", f"{index:04d}.txt")
-    if not os.path.exists(txt_path):
-        channel_align_parameter_object = itk.ParameterObject.New()
-        channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
-        channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
-        shear_corrected = tifffile.imread(tif_path).astype(np.float32)
-        if stack_shape[0]==1:
-            shear_corrected = shear_corrected[np.newaxis,:,:,:]
-        params = align_channels(shear_corrected, channel_align_parameter_object)
-        params.WriteParameterFile(params, txt_path)
-        # print(f'Stack {index:04d} aligned')
+    align_path = os.path.join(out_dir, "aligned", f"{index:04d}.tif")
+
+    # if not os.path.exists(tif_path):
+    shear_correct_parameter_object = itk.ParameterObject.New()
+    shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
+    shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
+    stack = get_stack(input_nd2, index, noise_stack, stack_shape=stack_shape)
+    shear_corrected = shear_correct(stack, shear_correct_parameter_object)
+    shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
+    tifffile.imwrite(tif_path, shear_corrected, imagej=True)
+    # print(f'Stack {index:04d} shear corrected')
+
+    
+    # if not os.path.exists(txt_path):
+    channel_align_parameter_object = itk.ParameterObject.New()
+    channel_align_parameter_map = channel_align_parameter_object.GetDefaultParameterMap('rigid', 1)
+    channel_align_parameter_object.AddParameterMap(channel_align_parameter_map)
+    shear_corrected = tifffile.imread(tif_path).astype(np.float32)
+    if stack_shape[0]==1:
+        shear_corrected = shear_corrected[np.newaxis,:,:,:]
+    channel_aligned, params = align_channels(shear_corrected, channel_align_parameter_object)
+    params.WriteParameterFile(params, txt_path)
+    tifffile.imwrite(align_path, channel_aligned, imagej=True)
+    # print(f'Stack {index:04d} aligned')
 
 if __name__ == '__main__':
     main()
