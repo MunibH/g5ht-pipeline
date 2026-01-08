@@ -76,6 +76,11 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
     shear_correct_parameter_object = itk.ParameterObject.New()
     shear_correct_parameter_map = shear_correct_parameter_object.GetDefaultParameterMap('rigid', 4)
     shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map)
+    
+    # # add bspline to parameter object for smoother transformations
+    # shear_correct_parameter_map_bspline = shear_correct_parameter_object.GetDefaultParameterMap('bspline', 4)
+    # shear_correct_parameter_map_bspline['FinalGridSpacingInVoxels'] = ['16']
+    # shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map_bspline)
 
     stack = get_stack(input_nd2, index, noise_stack, stack_shape)
     shear_corrected = shear_correct(stack, shear_correct_parameter_object)
@@ -94,7 +99,7 @@ def main():
     end_idx = int(sys.argv[3])
     noise_pth = sys.argv[4]
     stack_length = int(sys.argv[5])
-    n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
+    n_workers = int(sys.argv[6]) if sys.argv[6].lower() != 'all' else 10
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
 

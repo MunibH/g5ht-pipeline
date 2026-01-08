@@ -9,20 +9,120 @@ import sys
 from skimage import morphology, measure
 import tifffile
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from scipy.ndimage import distance_transform_edt
 
+def _as_yx_array(data):
+    return np.asarray(data, dtype=np.float32)
 
-def orient_all(last_pt, spline_dict):
+def _clip_yx(yx, shape):
+    y, x = int(yx[0]), int(yx[1])
+    y = np.clip(y, 0, shape[0] - 1)
+    x = np.clip(x, 0, shape[1] - 1)
+    return np.array([y, x], dtype=np.int32)
+
+def bootstrap_nose_from_mask_and_centerline(spline0_yx, mask0, k=40):
+    """
+    Decide which end of the centerline is the nose on frame 0.
+    Uses a thickness proxy: distance-to-boundary (via distance transform)
+    averaged over first k points from each end.
+
+    In a body mask, the tail is often thinner; the nose/head can be thicker near pharynx.
+    This heuristic is not perfect, but it's decent and only used for frame 0 bootstrap.
+    """
+    pts = _as_yx_array(spline0_yx)
+    if pts.shape[0] < 2:
+        return pts[0].tolist()
+
+    k = min(k, pts.shape[0] // 2)
+    # distance to nearest background pixel (radius proxy)
+    dt = distance_transform_edt(mask0.astype(bool))
+
+    def mean_radius(prefix_pts):
+        ys = np.clip(prefix_pts[:, 0].astype(int), 0, mask0.shape[0] - 1)
+        xs = np.clip(prefix_pts[:, 1].astype(int), 0, mask0.shape[1] - 1)
+        return float(np.mean(dt[ys, xs]))
+
+    r0 = mean_radius(pts[:k])
+    r1 = mean_radius(pts[-k:])
+
+    # pick the end with larger average radius as "head/nose-side"
+    # (swap if in your masks tail tends to be thicker)
+    nose = pts[0] if r0 <= r1 else pts[-1]
+    return _clip_yx(nose, mask0.shape).tolist()
+
+def orient_all_tracked(spline_dict, mask_stack, crop_n=350,
+                       bootstrap_k=40,
+                       jump_mult=6.0,
+                       jump_px_min=12.0):
+    """
+    Robust orientation using last nose position + sanity checks.
+
+    - Bootstraps nose on frame 0 from mask+centerline thickness.
+    - For each subsequent frame:
+        choose endpoint closest to last nose
+        sanity check: if jump is implausibly big, try the other endpoint;
+                      if still bad, keep previous orientation (don't flip).
+    """
     out_dict = {}
+
+    # ---- bootstrap last_nose from frame 0
+    s0 = _as_yx_array(spline_dict[0])
+    last_nose = bootstrap_nose_from_mask_and_centerline(s0, mask_stack[0], k=bootstrap_k)
+    last_nose = np.asarray(last_nose, dtype=np.float32)
+
+    # keep a running estimate of typical motion (median of accepted jumps)
+    accepted_jumps = []
+
     for i in range(len(spline_dict)):
-        data = spline_dict[i]
-        data_arr = np.array(data)
-        dist_unflipped = np.linalg.norm(data_arr[0] - last_pt)
-        dist_flip = np.linalg.norm(data_arr[-1] - last_pt)
-        if dist_flip < dist_unflipped:
-            data = data[::-1]
-        last_pt = data[0]
-        out_dict[i] = data[:350]
+        pts = _as_yx_array(spline_dict[i])
+        if pts.shape[0] < 2:
+            out_dict[i] = pts.tolist()
+            continue
+
+        p0 = pts[0]
+        p1 = pts[-1]
+
+        d0 = float(np.linalg.norm(p0 - last_nose))
+        d1 = float(np.linalg.norm(p1 - last_nose))
+
+        # choose closest to last nose
+        choose_flip = d1 < d0
+        chosen_d = min(d0, d1)
+        other_d  = max(d0, d1)
+
+        # dynamic jump threshold: based on history, with a floor
+        if accepted_jumps:
+            med = float(np.median(accepted_jumps))
+            jump_thresh = max(jump_px_min, jump_mult * med)
+        else:
+            # early frames: be permissive but not infinite
+            jump_thresh = 40.0  # tweak if needed
+
+        # if chosen jump seems too large, try the other endpoint
+        if chosen_d > jump_thresh and other_d < chosen_d:
+            choose_flip = not choose_flip
+            chosen_d = other_d
+
+        # if STILL too large, we assume spline is bad this frame; don't flip,
+        # and keep last_nose (i.e., orient by continuity, but don't update)
+        if chosen_d > jump_thresh:
+            # do not update last_nose, but still output something oriented
+            # prefer orientation that keeps endpoint closer to last_nose
+            choose_flip = d1 < d0
+            pts_oriented = pts[::-1] if choose_flip else pts
+            out_dict[i] = pts_oriented[:crop_n].tolist()
+            continue
+
+        # accept orientation
+        pts_oriented = pts[::-1] if choose_flip else pts
+        out_dict[i] = pts_oriented[:crop_n].tolist()
+
+        # update last_nose and motion stats
+        last_nose = pts_oriented[0]
+        accepted_jumps.append(chosen_d)
+
     return out_dict
+
 
 def visualize_frame(seg, nodes, spline_dilation=4):
     out = np.zeros(seg.shape, np.bool)
@@ -36,16 +136,18 @@ def main():
     fullfile_spline  = sys.argv[1]
     spline_path = os.path.dirname(fullfile_spline)
 
-    # last_pt is represented as (y,x)
-    last_pt = [np.clip(int(i), 0, 512) for i in sys.argv[2:4]]
-
-    #reads spline
+    # reads spline
     with open(os.path.join(spline_path,'spline.json'), 'r') as f:
         spline_dict = json.load(f)
     spline_dict = {int(k): v for k, v in spline_dict.items()}
 
-    #orients all
-    out_dict = orient_all(last_pt, spline_dict)
+    # load mask stack (dilated.tif is body mask)
+    dilated = tifffile.imread(os.path.join(spline_path, 'dilated.tif')).astype(bool)
+
+    # If user provided nose_y nose_x, you *can* still support it, but you no longer need it.
+    # We'll ignore sys.argv[2:4] and do fully automatic tracked orientation:
+    out_dict = orient_all_tracked(spline_dict, dilated)
+
 
     #saves outputs
     with open(os.path.join(spline_path, 'oriented.json'), 'w') as f:
