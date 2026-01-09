@@ -23,7 +23,7 @@ def main():
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
     tif_paths = sorted(tif_paths)[:]
     
-    binning_factor = 5
+    binning_factor = 2
     
     # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
     # load each tif, and perform binning, create a (time, z, height, width) array
