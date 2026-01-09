@@ -7,6 +7,10 @@ import sys
 import os
 import tifffile
 import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
+import matplotlib.pyplot as plt
+import glob
+
+# utils for loading and preprocessing data
 
 def get_noise_stack(noise_path, stack_length=41):
     noise_tif = tifffile.imread(noise_path)
@@ -64,4 +68,20 @@ def get_beads_alignment_file(input_nd2):
         return None
     else:
         return beads_file
-   
+
+
+# utils for plotting data
+def pretty_plot(tick_dir='out', tick_length=5, tick_width=1, spine_width=0.5, figsize=(6,4), fontsize=15, top_border=False, right_border=False):
+    plt.rcParams['font.family'] = 'Arial'
+    plt.rcParams.update({'font.size': fontsize})
+    plt.rcParams['svg.fonttype'] = 'none'
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.tick_params(direction=tick_dir, length=tick_length, width=tick_width)
+    for spine in ax.spines.values():
+        spine.set_linewidth(spine_width)
+    if not top_border:
+        ax.spines['top'].set_visible(False)
+    if not right_border:
+        ax.spines['right'].set_visible(False)
+
+    return plt, ax

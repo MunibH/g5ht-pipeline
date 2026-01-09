@@ -53,9 +53,9 @@ def main():
 
     fixed = tifffile.imread(os.path.join(input_dir, 'fixed.tif'))
     img = np.zeros((200, 500, 3), np.float32)
-    img[..., 0] = np.max(fixed[:, 1], axis=0)
-    img[..., 0] = np.clip(img[..., 0] / 400, 0, 1)
-    img = (img * 255).astype(np.ubyte)
+    img[..., 0] = np.max(fixed[:, 1], axis=0) # green channel max projection
+    img[..., 0] = np.clip(img[..., 0] / 400, 0, 1) # adjust contrast for visualization
+    img = (img * 255).astype(np.ubyte) # convert to uint8 for visualization
 
     plt.figure(figsize=(10, 4))
     contours = measure.find_contours(np.max(mask == 1, axis=0), level=0.5)

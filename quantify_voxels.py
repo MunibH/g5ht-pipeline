@@ -23,7 +23,7 @@ def main():
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
     tif_paths = sorted(tif_paths)[:]
     
-    binning_factor = 2
+    binning_factor = 4
     
     # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
     # load each tif, and perform binning, create a (time, z, height, width) array
@@ -65,7 +65,11 @@ def main():
         # Normalize channel 0 by channel 1 for each z-slice
         # binned is now (Z, C, H_binned, W_binned)
         # Add small epsilon to avoid division by zero
-        normalized_data[i] = binned[:, 0] / (binned[:, 1] + 1e-10)
+        normalized_data[i] = binned[:, 0] / (binned[:, 1] + 1e-6)
+        
+    # now normalize data so that it is F/F10, where F10 is the 10th percentile of the entire time series for each voxel
+    # F10 = np.percentile(normalized_data, 10, axis=0)
+    # normalized_data = normalized_data / (F10 + 1e-6)
     
     # Now normalized_data is (T, Z, H, W) array ready for further processing
     print(f"Processed data shape: {normalized_data.shape}")
@@ -74,52 +78,3 @@ def main():
     # Save the normalized data
     np.save(os.path.join(input_dir, 'normalized_voxels.npy'), normalized_data)
     print(f"Saved normalized data to {os.path.join(input_dir, 'normalized_voxels.npy')}")
-
-    # out = np.zeros((len(tif_paths), 3))
-    # out[:] = np.nan
-    # for i in tqdm(range(len(out))):
-    #     stack = tifffile.imread(tif_paths[i])
-    #     for j in range(3):
-    #         denominator =  np.sum(stack[:, 1][mask == j + 1])
-    #         if denominator > 0:
-    #             out[i, j] = np.sum(stack[:, 0][mask == j + 1]) / denominator
-
-    # t = np.arange(len(out)) * 0.533 / 60
-    # # df = pd.DataFrame(out, index=t)
-    # df = df.interpolate()
-    # df.to_csv(os.path.join(input_dir, 'quantified.csv'))
-
-    # plt.figure(figsize=(10, 4))
-    # plt.plot(t, out[:, 0] / np.mean(out[:60, 0]), label='Dorsal nerve ring')
-    # plt.plot(t, out[:, 1] / np.mean(out[:60, 1]), label='Ventral nerve ring')
-    # plt.plot(t, out[:, 2] / np.mean(out[:60, 2]), label='Pharynx')
-    # plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
-    # plt.xlabel('Time (min)')
-    # plt.ylabel(r'$F/F_{baseline}$')
-    # plt.xlim(0, np.max(t))
-    # plt.axhline(1, ls='--', c='k', zorder=0)
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(input_dir, 'quantified.png'), dpi=300)
-    # plt.show()
-
-    # fixed = tifffile.imread(os.path.join(input_dir, 'fixed.tif'))
-    # img = np.zeros((200, 500, 3), np.float32)
-    # img[..., 0] = np.max(fixed[:, 1], axis=0)
-    # img[..., 0] = np.clip(img[..., 0] / 400, 0, 1)
-    # img = (img * 255).astype(np.ubyte)
-
-    # plt.figure(figsize=(10, 4))
-    # contours = measure.find_contours(np.max(mask == 1, axis=0), level=0.5)
-    # for contour in contours:
-    #     plt.plot(contour[:, 1], contour[:, 0], color='C0', linewidth=2)
-    # contours = measure.find_contours(np.max(mask == 2, axis=0), level=0.5)
-    # for contour in contours:
-    #     plt.plot(contour[:, 1], contour[:, 0], color='C1', linewidth=2)
-    # contours = measure.find_contours(np.max(mask == 3, axis=0), level=0.5)
-    # for contour in contours:
-    #     plt.plot(contour[:, 1], contour[:, 0], color='C2', linewidth=2)
-    # plt.imshow(img)
-    # plt.axis('off')
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(input_dir , 'roi.png'), dpi=300)
-    # plt.show()
