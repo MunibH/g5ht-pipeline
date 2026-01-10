@@ -7,13 +7,14 @@ import glob
 from skimage import measure
 import os
 from tqdm import tqdm
+import scipy.ndimage as ndi
 
 import matplotlib
-font = {'family' : 'DejaVu Sans',
+font = {'family' : 'Arial',
         'weight' : 'normal',
         'size'   : 15}
 matplotlib.rc('font', **font)
-
+plt.rcParams['svg.fonttype'] = 'none'
 
 def main():
 
@@ -23,6 +24,7 @@ def main():
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
     tif_paths = sorted(tif_paths)[:]
     mask = tifffile.imread(os.path.join(input_dir, 'roi.tif'))
+    mask = ndi.zoom(mask, zoom=(1/3,1,1), order=0) # ensure mask has same shape as stacks
 
     out = np.zeros((len(tif_paths), 3))
     out[:] = np.nan
@@ -34,7 +36,7 @@ def main():
                 out[i, j] = np.sum(stack[:, 0][mask == j + 1]) / denominator
 
     t = np.arange(len(out)) * 0.533 / 60
-    # df = pd.DataFrame(out, index=t)
+    df = pd.DataFrame(out, index=t)
     df = df.interpolate()
     df.to_csv(os.path.join(input_dir, 'quantified.csv'))
 
@@ -49,6 +51,7 @@ def main():
     plt.axhline(1, ls='--', c='k', zorder=0)
     plt.tight_layout()
     plt.savefig(os.path.join(input_dir, 'quantified.png'), dpi=300)
+    plt.savefig(os.path.join(input_dir, 'quantified.svg'), dpi=300)
     plt.show()
 
     fixed = tifffile.imread(os.path.join(input_dir, 'fixed.tif'))
@@ -71,6 +74,7 @@ def main():
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(os.path.join(input_dir , 'roi.png'), dpi=300)
+    plt.savefig(os.path.join(input_dir , 'roi.svg'), dpi=300)
     plt.show()
 
     # -- separate channels --

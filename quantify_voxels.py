@@ -18,12 +18,15 @@ matplotlib.rc('font', **font)
 def main():
 
     input_dir = sys.argv[1]
+    binning_factor = sys.argv[2] if len(sys.argv) > 2 else 4
+    
     registered_dir = os.path.join(input_dir, 'registered_wholistic_smooth-0.200_patch-7')
 
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
-    tif_paths = sorted(tif_paths)[:]
+    # sort 
+    tif_paths = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
     
-    binning_factor = 4
+    
     
     # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
     # load each tif, and perform binning, create a (time, z, height, width) array
@@ -45,7 +48,7 @@ def main():
     normalized_data = np.zeros((len(tif_paths), z_slices, h_binned, w_binned))
     
     for i, tif_path in enumerate(tqdm(tif_paths, desc="Processing stacks")):
-        stack = tifffile.imread(tif_path)
+        stack = tifffile.imread(tif_path).astype(np.float32).clip(min=0, max=4096)  # Ensure no negative values
         
         # Reshape to (Z, 2, H, W) if needed
         if stack.ndim == 3:
@@ -65,7 +68,11 @@ def main():
         # Normalize channel 0 by channel 1 for each z-slice
         # binned is now (Z, C, H_binned, W_binned)
         # Add small epsilon to avoid division by zero
-        normalized_data[i] = binned[:, 0] / (binned[:, 1] + 1e-6)
+        normalized_data[i] = binned[:, 0] #/ (binned[:, 1] + 1e-6)
+        # baseline normalize by each voxels' mean across time to get F/F_baseline
+        # baseline is times points 5 to 35
+        baseline = normalized_data[max(0, i-30):i+1].mean(axis=0)  # Use previous 30 frames for baseline
+        normalized_data[i] = normalized_data[i] / (baseline + 1e-6)
         
     # now normalize data so that it is F/F10, where F10 is the 10th percentile of the entire time series for each voxel
     # F10 = np.percentile(normalized_data, 10, axis=0)
@@ -77,4 +84,4 @@ def main():
     
     # Save the normalized data
     np.save(os.path.join(input_dir, 'normalized_voxels.npy'), normalized_data)
-    print(f"Saved normalized data to {os.path.join(input_dir, 'normalized_voxels.npy')}")
+    print(f"Saved normalized data (ratiometric) to {os.path.join(input_dir, 'normalized_voxels.npy')}")

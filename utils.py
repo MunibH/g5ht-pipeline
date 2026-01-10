@@ -71,7 +71,7 @@ def get_beads_alignment_file(input_nd2):
 
 
 # utils for plotting data
-def pretty_plot(tick_dir='out', tick_length=5, tick_width=1, spine_width=0.5, figsize=(6,4), fontsize=15, top_border=False, right_border=False):
+def pretty_plot(figsize=(6,4), tick_dir='out', tick_length=5, tick_width=1, spine_width=0.5, fontsize=15, top_border=False, right_border=False):
     plt.rcParams['font.family'] = 'Arial'
     plt.rcParams.update({'font.size': fontsize})
     plt.rcParams['svg.fonttype'] = 'none'
