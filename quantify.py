@@ -7,13 +7,14 @@ import glob
 from skimage import measure
 import os
 from tqdm import tqdm
+import scipy.ndimage as ndi
 
 import matplotlib
-font = {'family' : 'DejaVu Sans',
+font = {'family' : 'Arial',
         'weight' : 'normal',
         'size'   : 15}
 matplotlib.rc('font', **font)
-
+plt.rcParams['svg.fonttype'] = 'none'
 
 def main():
 
@@ -23,6 +24,7 @@ def main():
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
     tif_paths = sorted(tif_paths)[:]
     mask = tifffile.imread(os.path.join(input_dir, 'roi.tif'))
+    mask = ndi.zoom(mask, zoom=(1/3,1,1), order=0) # ensure mask has same shape as stacks
 
     out = np.zeros((len(tif_paths), 3))
     out[:] = np.nan
@@ -34,7 +36,7 @@ def main():
                 out[i, j] = np.sum(stack[:, 0][mask == j + 1]) / denominator
 
     t = np.arange(len(out)) * 0.533 / 60
-    # df = pd.DataFrame(out, index=t)
+    df = pd.DataFrame(out, index=t)
     df = df.interpolate()
     df.to_csv(os.path.join(input_dir, 'quantified.csv'))
 
@@ -49,13 +51,14 @@ def main():
     plt.axhline(1, ls='--', c='k', zorder=0)
     plt.tight_layout()
     plt.savefig(os.path.join(input_dir, 'quantified.png'), dpi=300)
+    plt.savefig(os.path.join(input_dir, 'quantified.svg'), dpi=300)
     plt.show()
 
     fixed = tifffile.imread(os.path.join(input_dir, 'fixed.tif'))
     img = np.zeros((200, 500, 3), np.float32)
-    img[..., 0] = np.max(fixed[:, 1], axis=0)
-    img[..., 0] = np.clip(img[..., 0] / 400, 0, 1)
-    img = (img * 255).astype(np.ubyte)
+    img[..., 0] = np.max(fixed[:, 1], axis=0) # green channel max projection
+    img[..., 0] = np.clip(img[..., 0] / 400, 0, 1) # adjust contrast for visualization
+    img = (img * 255).astype(np.ubyte) # convert to uint8 for visualization
 
     plt.figure(figsize=(10, 4))
     contours = measure.find_contours(np.max(mask == 1, axis=0), level=0.5)
@@ -71,6 +74,7 @@ def main():
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(os.path.join(input_dir , 'roi.png'), dpi=300)
+    plt.savefig(os.path.join(input_dir , 'roi.svg'), dpi=300)
     plt.show()
 
     # -- separate channels --
