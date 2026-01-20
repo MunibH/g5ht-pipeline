@@ -69,9 +69,11 @@ def create_grid(height, width, grid_spacing_x, grid_spacing_y):
 def calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spacing_y, bin_factor=1):
     """
     Calculate mean intensity in each grid square for each time point and z-slice.
+    No normalization is applied - data is used as-is.
+    No masking is applied - all grid squares are computed, with mask coverage saved for reference.
     
     Args:
-        normalized_data: (T, Z, H, W) array
+        normalized_data: (T, Z, H, W) array - already normalized data
         mask: (H, W) array
         grid_spacing_x: grid size in x direction
         grid_spacing_y: grid size in y direction
@@ -80,7 +82,11 @@ def calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spaci
     Returns:
         grid_timeseries: (T, Z, n_grids_y, n_grids_x) array
         grid_info: list of grid boundaries
+        n_grids_y: number of grids in y direction
+        n_grids_x: number of grids in x direction
         mask_binned: binned mask
+        grid_mask_coverage: (Z, n_grids_y, n_grids_x) array - mask coverage for each grid (0-1)
+        grid_in_mask: (n_grids_y, n_grids_x) boolean array - True if grid is within mask
     """
     n_time, n_z, height, width = normalized_data.shape
     
@@ -103,35 +109,34 @@ def calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spaci
     print(f"Grid: {n_grids_y} rows x {n_grids_x} cols = {len(grid_info)} grids per z-slice")
     print(f"Total grids across all z-slices: {len(grid_info) * n_z}")
     
-    # Initialize output array
+    # Initialize output arrays
     grid_timeseries = np.zeros((n_time, n_z, n_grids_y, n_grids_x))
     grid_mask_coverage = np.zeros((n_z, n_grids_y, n_grids_x))
+    grid_in_mask = np.zeros((n_grids_y, n_grids_x), dtype=bool)
     
-    # Calculate intensity for each grid
+    # Calculate intensity for each grid (no masking applied to data)
     for grid_id, y_start, y_end, x_start, x_end in tqdm(grid_info, desc="Processing grids"):
         gy = grid_id // n_grids_x
         gx = grid_id % n_grids_x
         
-        # Get mask for this grid region
+        # Get mask coverage for this grid region (for reference, not for masking)
         grid_mask = mask_binned[y_start:y_end, x_start:x_end]
         mask_coverage = grid_mask.mean()
         
+        # Determine if this grid is within the mask (using threshold of 0.5)
+        grid_in_mask[gy, gx] = mask_coverage >= 0.5
+        
         for z in range(n_z):
-            # Get data for this grid region
+            # Get data for this grid region - NO MASKING applied
             grid_data = normalized_data[:, z, y_start:y_end, x_start:x_end]
             
-            # Apply mask and calculate mean
-            masked_data = grid_data * grid_mask[np.newaxis, :, :]
+            # Calculate mean over all voxels in grid (no masking)
+            grid_timeseries[:, z, gy, gx] = grid_data.mean(axis=(1, 2))
             
-            if mask_coverage > 0:
-                # Mean over masked voxels
-                grid_timeseries[:, z, gy, gx] = masked_data.sum(axis=(1, 2)) / (grid_mask.sum() + 1e-6)
-            else:
-                grid_timeseries[:, z, gy, gx] = 0
-            
+            # Store mask coverage for reference
             grid_mask_coverage[z, gy, gx] = mask_coverage
     
-    return grid_timeseries, grid_info, n_grids_y, n_grids_x, mask_binned, grid_mask_coverage
+    return grid_timeseries, grid_info, n_grids_y, n_grids_x, mask_binned, grid_mask_coverage, grid_in_mask
 
 
 def causal_smooth(data, sigma=2.0, truncate=4.0):
@@ -185,21 +190,25 @@ def causal_smooth(data, sigma=2.0, truncate=4.0):
     return smoothed
 
 
-def flatten_grid_timeseries(grid_timeseries, grid_mask_coverage, grid_baseline, min_coverage=0.1):
+def flatten_grid_timeseries(grid_timeseries, grid_mask_coverage, grid_baseline, grid_in_mask, min_coverage=0.0):
     """
     Flatten grid timeseries to (T, n_total_grids) with z-slice labels.
+    All grids are included (regardless of mask), with in_mask indicator saved.
     
     Args:
         grid_timeseries: (T, Z, n_grids_y, n_grids_x) array
         grid_mask_coverage: (Z, n_grids_y, n_grids_x) array
         grid_baseline: (Z, n_grids_y, n_grids_x) array - pre-computed baseline per grid
-        min_coverage: minimum mask coverage to include a grid
+        grid_in_mask: (n_grids_y, n_grids_x) boolean array - True if grid is within mask
+        min_coverage: minimum mask coverage to include a grid (default: 0.0, include all)
         
     Returns:
         flat_timeseries: (T, n_valid_grids) array
         z_labels: z-slice label for each grid
         grid_labels: (gy, gx) label for each grid
         flat_baseline: (n_valid_grids,) array - baseline for each valid grid
+        flat_in_mask: (n_valid_grids,) boolean array - whether each grid is in mask
+        unflatten_info: dict containing info needed to unflatten back to original shape
     """
     n_time, n_z, n_grids_y, n_grids_x = grid_timeseries.shape
     
@@ -207,7 +216,10 @@ def flatten_grid_timeseries(grid_timeseries, grid_mask_coverage, grid_baseline, 
     z_labels = []
     grid_labels = []
     baseline_list = []
+    in_mask_list = []
+    flat_to_grid_idx = []  # Maps flat index to (z, gy, gx)
     
+    flat_idx = 0
     for z in range(n_z):
         for gy in range(n_grids_y):
             for gx in range(n_grids_x):
@@ -216,12 +228,99 @@ def flatten_grid_timeseries(grid_timeseries, grid_mask_coverage, grid_baseline, 
                     z_labels.append(z)
                     grid_labels.append((gy, gx))
                     baseline_list.append(grid_baseline[z, gy, gx])
+                    in_mask_list.append(grid_in_mask[gy, gx])
+                    flat_to_grid_idx.append((z, gy, gx))
+                    flat_idx += 1
     
     flat_timeseries = np.array(flat_list).T  # (T, n_valid_grids)
     z_labels = np.array(z_labels)
     flat_baseline = np.array(baseline_list)  # (n_valid_grids,)
+    flat_in_mask = np.array(in_mask_list)  # (n_valid_grids,)
     
-    return flat_timeseries, z_labels, grid_labels, flat_baseline
+    # Create unflatten info for reconstructing original shape
+    unflatten_info = {
+        'n_time': n_time,
+        'n_z': n_z,
+        'n_grids_y': n_grids_y,
+        'n_grids_x': n_grids_x,
+        'flat_to_grid_idx': np.array(flat_to_grid_idx),  # (n_valid_grids, 3) - (z, gy, gx) for each flat idx
+        'grid_mask_coverage': grid_mask_coverage,
+        'min_coverage': min_coverage
+    }
+    
+    return flat_timeseries, z_labels, grid_labels, flat_baseline, flat_in_mask, unflatten_info
+
+
+def unflatten_grid_timeseries(flat_timeseries, unflatten_info, fill_value=np.nan):
+    """
+    Unflatten a (T, n_valid_grids) array back to (T, Z, n_grids_y, n_grids_x) shape.
+    
+    Args:
+        flat_timeseries: (T, n_valid_grids) array
+        unflatten_info: dict containing:
+            - n_time: int
+            - n_z: int
+            - n_grids_y: int
+            - n_grids_x: int
+            - flat_to_grid_idx: (n_valid_grids, 3) array of (z, gy, gx) indices
+        fill_value: value to fill for grids that were excluded (default: np.nan)
+        
+    Returns:
+        grid_timeseries: (T, Z, n_grids_y, n_grids_x) array
+    """
+    n_time = flat_timeseries.shape[0]
+    n_z = unflatten_info['n_z']
+    n_grids_y = unflatten_info['n_grids_y']
+    n_grids_x = unflatten_info['n_grids_x']
+    flat_to_grid_idx = unflatten_info['flat_to_grid_idx']
+    
+    # Initialize with fill value
+    grid_timeseries = np.full((n_time, n_z, n_grids_y, n_grids_x), fill_value)
+    
+    # Fill in the valid grids
+    for flat_idx, (z, gy, gx) in enumerate(flat_to_grid_idx):
+        grid_timeseries[:, z, gy, gx] = flat_timeseries[:, flat_idx]
+    
+    return grid_timeseries
+
+
+def load_flat_timeseries(filepath):
+    """
+    Load a saved flat timeseries .npz file and return data with unflatten info.
+    
+    Args:
+        filepath: path to grid_timeseries_flat.npz or grid_timeseries_flat_smoothed.npz
+        
+    Returns:
+        flat_timeseries: (T, n_grids) array
+        z_labels: z-slice label for each grid
+        grid_labels: (gy, gx) label for each grid
+        in_mask: boolean array indicating if each grid is within mask
+        unflatten_info: dict that can be passed to unflatten_grid_timeseries()
+        metadata: dict with additional info (baseline, z_range, etc.)
+    """
+    data = np.load(filepath, allow_pickle=True)
+    
+    flat_timeseries = data['timeseries']
+    z_labels = data['z_labels']
+    grid_labels = data['grid_labels']
+    in_mask = data['in_mask']
+    
+    unflatten_info = {
+        'n_z': int(data['n_z']),
+        'n_grids_y': int(data['n_grids_y']),
+        'n_grids_x': int(data['n_grids_x']),
+        'flat_to_grid_idx': data['flat_to_grid_idx'],
+        'z_offset': int(data['z_offset'])
+    }
+    
+    metadata = {
+        'baseline': data['baseline'],
+        'z_range': tuple(data['z_range']),
+        'baseline_window_sec': tuple(data['baseline_window_sec'])
+    }
+    
+    return flat_timeseries, z_labels, grid_labels, in_mask, unflatten_info, metadata
 
 
 def plot_timeseries(flat_timeseries, z_labels, fps=1.0, output_path=None, 
@@ -511,8 +610,11 @@ def main():
     
     # Calculate grid intensities on FULL time series first (before time trimming)
     # This allows us to compute baseline from the correct time window
-    grid_timeseries_full, grid_info, n_grids_y, n_grids_x, mask_binned, grid_mask_coverage = \
+    # Note: No masking is applied to the data, all grids are computed
+    grid_timeseries_full, grid_info, n_grids_y, n_grids_x, mask_binned, grid_mask_coverage, grid_in_mask = \
         calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spacing_y, bin_factor)
+    
+    print(f"Grids in mask: {grid_in_mask.sum()} / {grid_in_mask.size}")
     
     # Calculate baseline from specified time window (relative to recording start)
     n_time_total = grid_timeseries_full.shape[0]
@@ -547,30 +649,40 @@ def main():
     # The actual start time of the data after filtering
     data_start_time = start_time_sec
     
-    # Flatten with z-labels
-    flat_timeseries, z_labels, grid_labels, flat_baseline = flatten_grid_timeseries(
-        grid_timeseries, grid_mask_coverage, grid_baseline, min_coverage=0.1
+    # Flatten with z-labels (include all grids, min_coverage=0.0)
+    flat_timeseries, z_labels, grid_labels, flat_baseline, flat_in_mask, unflatten_info = flatten_grid_timeseries(
+        grid_timeseries, grid_mask_coverage, grid_baseline, grid_in_mask, min_coverage=0.0
     )
     
     # Adjust z_labels to reflect original z-slice indices
     z_labels = z_labels + z_offset
     
+    # Update unflatten_info with z_offset for proper reconstruction
+    unflatten_info['z_offset'] = z_offset
+    
     print(f"\nFinal time series shape: {flat_timeseries.shape}")
-    print(f"Number of valid grids: {len(z_labels)}")
+    print(f"Number of grids: {len(z_labels)}")
+    print(f"Grids in mask: {flat_in_mask.sum()} / {len(flat_in_mask)}")
     
     # Save grid timeseries
     output_file = os.path.join(input_dir, 'grid_timeseries.npy')
     np.save(output_file, grid_timeseries)
     print(f"Saved grid timeseries to {output_file}")
     
-    # Save flat timeseries with z-labels and baseline info
+    # Save flat timeseries with z-labels, baseline info, mask info, and unflatten info
     np.savez(os.path.join(input_dir, 'grid_timeseries_flat.npz'),
              timeseries=flat_timeseries,
              z_labels=z_labels,
              grid_labels=np.array(grid_labels),
              z_range=(z_start, z_end),
              baseline=flat_baseline,
-             baseline_window_sec=(baseline_start_sec, baseline_end_sec))
+             baseline_window_sec=(baseline_start_sec, baseline_end_sec),
+             in_mask=flat_in_mask,
+             flat_to_grid_idx=unflatten_info['flat_to_grid_idx'],
+             n_z=unflatten_info['n_z'],
+             n_grids_y=unflatten_info['n_grids_y'],
+             n_grids_x=unflatten_info['n_grids_x'],
+             z_offset=z_offset)
     print(f"Saved flat grid timeseries to {os.path.join(input_dir, 'grid_timeseries_flat.npz')}")
     
     # Apply causal smoothing for visualization
@@ -585,7 +697,13 @@ def main():
              grid_labels=np.array(grid_labels),
              z_range=(z_start, z_end),
              baseline=flat_baseline,
-             baseline_window_sec=(baseline_start_sec, baseline_end_sec))
+             baseline_window_sec=(baseline_start_sec, baseline_end_sec),
+             in_mask=flat_in_mask,
+             flat_to_grid_idx=unflatten_info['flat_to_grid_idx'],
+             n_z=unflatten_info['n_z'],
+             n_grids_y=unflatten_info['n_grids_y'],
+             n_grids_x=unflatten_info['n_grids_x'],
+             z_offset=z_offset)
     print(f"Saved smoothed flat grid timeseries to {os.path.join(input_dir, 'grid_timeseries_flat_smoothed.npz')}")
     
     # Visualize grid for example time point and z-slice

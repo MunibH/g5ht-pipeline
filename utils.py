@@ -8,6 +8,7 @@ import os
 import tifffile
 import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
 import matplotlib.pyplot as plt
+import matplotlib
 import glob
 
 # utils for loading and preprocessing data
@@ -49,14 +50,16 @@ def get_stack_from_nd2(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 5
     return denoised[:-trim]
 
 def get_stack_z_coordinates(input_nd2, index, stack_shape=(41, 2, 512, 512), trim=2):
+    # NOT COMPLETED
     """get piezo z-coordinates. in Albert's g5-ht recordings each z step is 1.08 um and voxels are 0.36 um^3
     The zstep value can be different in Munib's recordings"""
     stack = np.zeros(stack_shape, np.float32)
     frame_indices = np.arange(stack_shape[0] * index, stack_shape[0] * (index + 1))
     with ND2Reader(input_nd2) as f:
-        for i, j in enumerate(frame_indices):
-            zcoords = None
-            zcoords_um = None
+        zcoords = f.metadata['z_positions'][frame_indices]
+        zstep = f.metadata['z_step_size']
+    zcoords_um = (zcoords - np.min(zcoords)) / zstep * 0.36
+    # zcoords_um = zcoords_um[:-trim]
     return zcoords, zcoords_um
 
 def get_beads_alignment_file(input_nd2):
@@ -71,6 +74,13 @@ def get_beads_alignment_file(input_nd2):
 
 
 # utils for plotting data
+
+def default_plt_params():
+    font = {'family' : 'Arial',
+            'weight' : 'normal',
+            'size'   : 15}
+    matplotlib.rc('font', **font)
+
 def pretty_plot(figsize=(6,4), tick_dir='out', tick_length=5, tick_width=1, spine_width=0.5, fontsize=15, top_border=False, right_border=False):
     plt.rcParams['font.family'] = 'Arial'
     plt.rcParams.update({'font.size': fontsize})

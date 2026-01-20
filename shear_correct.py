@@ -37,7 +37,8 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
     if stack_shape[0]==1:
         return denoised
     else:
-        return denoised[:-trim]
+        # return denoised[:-trim]
+        return denoised
     
 
 def register(fixed, moving, parameter_object, threads=8):
@@ -103,7 +104,8 @@ def main():
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
 
-    out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
+    # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
+    out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
     os.makedirs(out_dir, exist_ok=True)
 
     noise_stack = get_noise_stack(noise_pth)
