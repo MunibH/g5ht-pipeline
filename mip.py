@@ -479,7 +479,7 @@ def main():
 
     z_indices, needs_padding, focus, sharpness, diag = select_consistent_z_slices(
     out_dir, tif_dir, stack_range,
-    n_slices=30,           # number of z-slices to select per frame
+    n_slices=24,           # number of z-slices to select per frame (at 1.08 um per slice, this is roughly the largest we should go)
     smooth_alpha=0.15,    # causal smoothing (smaller = smoother)
     sharpness_threshold_percentile=30,
 )
