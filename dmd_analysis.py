@@ -40,6 +40,8 @@ def load_data(input_dir):
     
     # Load mask
     fixed_mask_files = glob.glob(os.path.join(input_dir, 'fixed_mask_*.tif'))
+    if fixed_mask_files is None or len(fixed_mask_files) == 0:
+        fixed_mask_files = glob.glob(os.path.join(input_dir, 'fixed_mask*.tif'))
     if not fixed_mask_files:
         raise FileNotFoundError(f"No fixed_mask_*.tif found in {input_dir}")
     
@@ -641,7 +643,8 @@ def main():
     
     # Apply causal smoothing for visualization
     print("\nApplying causal smoothing for visualization...")
-    data_smoothed = causal_smooth(data_filtered, sigma=2.0)
+    # data_smoothed = causal_smooth(data_filtered, sigma=2.0)
+    data_smoothed = data_filtered
     
     # Trim data based on start_time
     start_frame = int(start_time_sec * fps)

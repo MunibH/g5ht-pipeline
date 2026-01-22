@@ -41,6 +41,8 @@ def load_data(input_dir):
     
     # Load mask
     fixed_mask_files = glob.glob(os.path.join(input_dir, 'fixed_mask_*.tif'))
+    if fixed_mask_files is None or len(fixed_mask_files) == 0:
+        fixed_mask_files = glob.glob(os.path.join(input_dir, 'fixed_mask*.tif'))
     if not fixed_mask_files:
         raise FileNotFoundError(f"No fixed_mask_*.tif found in {input_dir}")
     
@@ -680,7 +682,7 @@ def main():
     baseline = data_matrix[baseline_start_frame:baseline_end_frame, :].mean(axis=0)
     
     # F/F0 normalization
-    data_normalized = data_matrix / (baseline + 1e-6)
+    data_normalized = data_matrix# / (baseline + 1e-6)
     
     # Apply lowpass filter to remove high-frequency noise
     if lowpass_freq is not None and lowpass_freq > 0:
@@ -691,7 +693,8 @@ def main():
     
     # Apply causal smoothing for visualization
     print("\nApplying causal smoothing...")
-    data_smoothed = causal_smooth(data_filtered, sigma=0.1)
+    # data_smoothed = causal_smooth(data_filtered, sigma=0.1)
+    data_smoothed = data_filtered
     
     # Trim data based on start_time
     start_frame = int(start_time_sec * fps)
