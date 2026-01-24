@@ -20,8 +20,11 @@ def orient_all(last_pt, spline_dict):
         dist_flip = np.linalg.norm(data_arr[-1] - last_pt)
         if dist_flip < dist_unflipped:
             data = data[::-1]
-        last_pt = data[0]
-        out_dict[i] = data[:350]
+        # Truncate first to ensure consistency
+        data = data[:350]
+        # Update last_pt with the first point of the truncated, oriented spline
+        last_pt = np.array(data[0])
+        out_dict[i] = data
     return out_dict
 
 def visualize_frame(seg, nodes, spline_dilation=4):

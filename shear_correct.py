@@ -12,12 +12,17 @@ from multiprocessing import Pool, cpu_count
 from functools import partial
 import tqdm  # optional, for progress bar
 
+'''
+Shear correction module for 3D image stacks using ITK elastix registration.
+Processes ND2 files, applies noise correction, and performs shear correction
+Trimmed z-slices can be specified.
+'''
 
 # noise_path = '/home/albert_w/scripts/noise_042925.tif'
 # noise_tif = tifffile.imread(noise_path)
 # noise_stack = np.stack([noise_tif] * 41, axis=0).astype(np.float32)
 
-def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim=2):
+def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), zplane_to_keep=(2,-1)):
     """Extracts and preprocesses a specific stack from the ND2 file, returns float32 array with trimmed z-slices."""
 
     if stack_shape[0]==1:
@@ -37,9 +42,12 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
     if stack_shape[0]==1:
         return denoised
     else:
-        # return denoised[:-trim]
-        return denoised
-    
+        start, end = zplane_to_keep
+
+        if end == -1:
+            return denoised[start:]
+        else:
+            return denoised[start:end+1]
 
 def register(fixed, moving, parameter_object, threads=8):
     """Performs rigid registration between two images using ITK's elastix with binary masks."""
@@ -68,7 +76,7 @@ def shear_correct(stack, parameter_object):
         output[i] = gfp_reg, rfp_reg
     return output
 
-def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512)):
+def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), zplane_to_keep=(2,-1)):
     """shear correct a single frame index"""
     tif_path = os.path.join(out_dir, f"{index:04d}.tif")
 
@@ -83,7 +91,7 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
     # shear_correct_parameter_map_bspline['FinalGridSpacingInVoxels'] = ['16']
     # shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map_bspline)
 
-    stack = get_stack(input_nd2, index, noise_stack, stack_shape)
+    stack = get_stack(input_nd2, index, noise_stack, stack_shape, zplane_to_keep)
     shear_corrected = shear_correct(stack, shear_correct_parameter_object)
     shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
     tifffile.imwrite(tif_path, shear_corrected, imagej=True)
@@ -104,8 +112,8 @@ def main():
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
 
-    # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
-    out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
+    out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
+    # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
     os.makedirs(out_dir, exist_ok=True)
 
     noise_stack = get_noise_stack(noise_pth)

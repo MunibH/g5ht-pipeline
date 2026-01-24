@@ -4,6 +4,7 @@ import scipy.ndimage as ndi
 import itk
 import sys
 import os
+import glob
 
 from itk import image_view_from_array
 
@@ -321,7 +322,7 @@ def register_without_masks(fixed_stack, moving_stack):
 #check if output already exists
 def main():
 	input_dir, index, zoom = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-	registered_pth = os.path.join(input_dir,'registered_elastix')
+	registered_pth = os.path.join(input_dir,'registered_elastix_3')
 	# registered_pth = os.path.join(input_dir,'registered')
 	warped_pth = os.path.join(input_dir,'warped')
 
@@ -334,10 +335,17 @@ def main():
 	moving_path = os.path.join(warped_pth,f'{index:04d}.tif')
 	moving_stack = tifffile.imread(moving_path).astype(np.float32)
 	moving_stack = ndi.zoom(moving_stack, zoom=(zoom, 1, 1, 1))
-	fixed_stack = tifffile.imread(os.path.join(input_dir, 'fixed.tif')).astype(np.float32)
+	
+	# load fixed stack, fixed filename will be `fixed_xxxx.tif`
+	# just look for the file that starts with 'fixed_' and has a 4 digit number after
+	fixed_fn = glob.glob(os.path.join(input_dir, 'fixed_[0-9][0-9][0-9][0-9]*.tif'))[0]
+	fixed_pth = os.path.join(input_dir, fixed_fn)
+	fixed_stack = tifffile.imread(fixed_pth).astype(np.float32)
 	fixed_stack = ndi.zoom(fixed_stack, zoom=(zoom, 1, 1, 1))
 
-	fixed_mask = tifffile.imread(os.path.join(input_dir, 'fixed_mask.tif'))
+	fixed_mask_fn = glob.glob(os.path.join(input_dir, 'fixed_mask_[0-9][0-9][0-9][0-9]*.tif'))[0]
+	fixed_mask_pth = os.path.join(input_dir, fixed_mask_fn)
+	fixed_mask = tifffile.imread(fixed_mask_pth)
 	fixed_mask_stack = np.stack([fixed_mask] * fixed_stack.shape[0])
 
 	moving_mask_path = os.path.join(input_dir, 'masks', f'{index:04d}.tif')
