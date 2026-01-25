@@ -102,7 +102,7 @@ def main():
         # save labeled columns
         df.columns = labels
         df.to_csv(os.path.join(input_dir, 'quantified.csv'))
-        plot_traces(df, input_dir=input_dir)
+        plot_traces(t, df, input_dir=input_dir)
         plot_rois(fixed, roi, input_dir=input_dir)
     else:
         df = pd.read_csv(os.path.join(input_dir, 'quantified.csv'), index_col=0)

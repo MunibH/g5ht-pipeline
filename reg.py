@@ -322,7 +322,7 @@ def register_without_masks(fixed_stack, moving_stack):
 #check if output already exists
 def main():
 	input_dir, index, zoom = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-	registered_pth = os.path.join(input_dir,'registered_elastix_3')
+	registered_pth = os.path.join(input_dir,'registered_elastix')
 	# registered_pth = os.path.join(input_dir,'registered')
 	warped_pth = os.path.join(input_dir,'warped')
 
