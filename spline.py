@@ -14,6 +14,8 @@ r_erosion = 32
 def get_dilated_seg(seg, r=r_dilation):
     label_img = measure.label(seg)
     props = measure.regionprops(label_img)
+    if len(props) == 0:
+        return np.zeros(seg.shape, np.bool)
     main_label = max(props, key=lambda p: p.area).label
     seg = (label_img == main_label)
     seg = morphology.isotropic_dilation(seg, r)
@@ -39,7 +41,10 @@ def make_graph(ske):
 def get_largest(G):
     nodes_to_remove = [node for node, degree in G.degree() if degree > 2]
     G.remove_nodes_from(nodes_to_remove)
-    largest_subgraph = max(nx.connected_components(G), key=len)
+    try:
+        largest_subgraph = max(nx.connected_components(G), key=len)
+    except ValueError: #max()np.iterablee argument is empty
+        largest_subgraph = []
     return G.subgraph(largest_subgraph)
 
 def follow_nodes(G):
@@ -62,7 +67,8 @@ def main():
 
     #reads label
     label = tif.imread(fullfile_label)
-
+    # label = label[484:,:,:]
+    
     #initializes outputs
     dilated_label = np.zeros(label.shape, np.bool)
     visualization = np.zeros(label.shape, np.bool)
@@ -72,7 +78,11 @@ def main():
     for i, frame in tqdm.tqdm(enumerate(label), total=len(label)):
         dilated_seg = get_dilated_seg(frame)
         ske = get_ske(dilated_seg)
-        nodes = follow_nodes(get_largest(make_graph(ske)))
+        largest = get_largest(make_graph(ske))
+        if len(largest) == 0:
+            nodes = []
+        else:
+            nodes = follow_nodes(largest)
 
         #writes to outputs
         dilated_label[i] = dilated_seg

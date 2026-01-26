@@ -29,6 +29,11 @@ def get_pts(tck, ts, interval=10, r=100):
     return moving_pts
 
 def initialize_tform(spline_data, nose_len=100, body_len=400):
+    # print(spline_data)
+    if len(spline_data) == 0:
+        # generate a (279,2) numpy array of points in a straight line
+        spline_data = np.array([[250 + i, 250] for i in range(-nose_len, body_len + 1)])
+    # print(spline_data.shape)
     tck, u = splprep(spline_data.T)
     l = get_length(tck)
     t_min = -nose_len / l

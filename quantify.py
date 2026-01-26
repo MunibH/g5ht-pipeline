@@ -21,6 +21,9 @@ colors = plt.cm.tab10(np.linspace(0, 1, 10))
 # function to plot traces
 def plot_traces(t, df, input_dir=None):
 
+    # convert t to seconds
+    # t = t * 60
+    # get data as numpy array
     out = df.values
     # get column labels
     labels = df.columns.tolist()
@@ -28,12 +31,20 @@ def plot_traces(t, df, input_dir=None):
 
     plt.figure(figsize=(10, 4))
     for i in range(nlabels):
-        plt.plot(t, out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)
+        # plt.plot(t, out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)
+        plt.plot(out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
     plt.xlabel('Time (min)')
-    plt.ylabel(r'$F/F_{baseline}$')
-    plt.xlim(0, np.max(t))
+    plt.xlabel('Frame')
+    plt.ylabel(r'$R/R_{baseline}$')
+    # plt.xlim(0, np.max(t))
+    plt.xlim(0, len(t)-1)
     plt.axhline(1, ls='--', c='k', zorder=0)
+    # make the xaxis ticks dense (lots of values shown)
+    # plt.xticks(np.arange(0, np.max(t)+1, step=0.5))
+    plt.xticks(np.arange(0, len(t)-1, step=50))
+    # rotate xticks 45 degrees
+    plt.xticks(rotation=45)
     plt.tight_layout()
     if input_dir is not None:
         plt.savefig(os.path.join(input_dir, 'quantified.png'), dpi=300)

@@ -11,11 +11,19 @@ import tifffile
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
-def orient_all(last_pt, spline_dict):
+def orient_all(last_pt, spline_dict, constrain_frame=None, constrain_nose=None):
     out_dict = {}
     for i in range(len(spline_dict)):
         data = spline_dict[i]
         data_arr = np.array(data)
+        # no spline sometimes if tracking failed and/or segmentation failed
+        if len(data_arr) == 0:
+            out_dict[i] = data
+            continue
+        # apply constraint if specified
+        if constrain_frame is not None and i == constrain_frame:
+            last_pt = np.array(constrain_nose)
+        # determine orientation based on distance to last_pt
         dist_unflipped = np.linalg.norm(data_arr[0] - last_pt)
         dist_flip = np.linalg.norm(data_arr[-1] - last_pt)
         if dist_flip < dist_unflipped:
@@ -41,6 +49,14 @@ def main():
 
     # last_pt is represented as (y,x)
     last_pt = [np.clip(int(i), 0, 512) for i in sys.argv[2:4]]
+    
+    # optional constraints
+    if len(sys.argv) == 7:
+        constrain_frame = int(sys.argv[4])
+        constrain_nose = [np.clip(int(i), 0, 512) for i in sys.argv[5:7]]
+    else:
+        constrain_frame = None
+        constrain_nose = None
 
     #reads spline
     with open(os.path.join(spline_path,'spline.json'), 'r') as f:
@@ -48,7 +64,7 @@ def main():
     spline_dict = {int(k): v for k, v in spline_dict.items()}
 
     #orients all
-    out_dict = orient_all(last_pt, spline_dict)
+    out_dict = orient_all(last_pt, spline_dict, constrain_frame, constrain_nose)
 
     #saves outputs
     with open(os.path.join(spline_path, 'oriented.json'), 'w') as f:
@@ -65,6 +81,8 @@ def main():
     plt.imshow(np.ones((512, 512)), cmap='gray', vmin=0, vmax=1)
     cmap = plt.get_cmap('viridis')
     for i in tqdm.tqdm(range(len(spline_dict))):
+        if len(out_dict[i]) == 0:
+            continue
         y, x = np.array(out_dict[i]).T
         color = cmap(i / (len(spline_dict) - 1))
         plt.scatter(x[0], y[0], color=color) # plot the nose
@@ -98,6 +116,13 @@ def main():
         ax.imshow(dilated[i,:,:], cmap='gray', vmin=0, vmax=1)
 
         # Get line and point data
+        if len(out_dict[i]) == 0:
+            # If no spline data, just capture the current frame
+            canvas.draw()
+            s, (width, height) = canvas.print_to_buffer()
+            frame_rgb = np.frombuffer(s, np.uint8).reshape((height, width, 4))[:, :, :3]
+            visualization_frames.append(frame_rgb)
+            continue
         y, x = np.array(out_dict[i]).T
         color = cmap(i / (len(spline_dict) - 1)) # Get the color for this frame
 
