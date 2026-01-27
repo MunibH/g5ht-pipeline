@@ -45,6 +45,7 @@ def main():
     input_dir = sys.argv[1]
     reg_dir = sys.argv[2]
     binning_factor = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+    baseline_window = sys.argv[4] if len(sys.argv) > 4 and isinstance(sys.argv[4], tuple) else (0, 60)
     
     registered_dir = os.path.join(input_dir, reg_dir)
 
@@ -105,7 +106,7 @@ def main():
     rfp_mean = normalized_rfp.mean(axis=0)  # Mean across time for channel 1
     normalized_data = np.divide(normalized_gfp, rfp_mean, out=np.zeros_like(normalized_gfp), where=rfp_mean!=0)
     # # baseline normalize by each voxel's mean over first 60 time points to get F/F_baseline
-    baseline = normalized_data[:60].mean(axis=0)
+    baseline = normalized_data[baseline_window[0]:baseline_window[1]].mean(axis=0)
     normalized_data = np.divide(normalized_data, baseline, out=np.zeros_like(normalized_data), where=baseline!=0)
     # divide each voxel by its 10th percentile across time
     # F10 = np.percentile(normalized_data, 10, axis=0)

@@ -19,10 +19,24 @@ plt.rcParams['svg.fonttype'] = 'none'
 colors = plt.cm.tab10(np.linspace(0, 1, 10))
 
 # function to plot traces
-def plot_traces(t, df, input_dir=None):
+def plot_traces(t, df, baseline_window=(0, 60), input_dir=None, time_type='min'):
+    # time_type: 'min' or 'sec' or 'frame
 
-    # convert t to seconds
-    # t = t * 60
+    if time_type == 'min':
+        t = t
+        xlabel = 'Time (min)'
+        xtick_step = 0.5
+    elif time_type == 'sec':
+        t = t * 60
+        xlabel = 'Time (sec)'
+        xtick_step = 30
+    elif time_type == 'frame':
+        t = np.arange(len(df))
+        xlabel = 'Frame'
+        xtick_step = 100
+    else:
+        raise ValueError('time_type must be "min", "sec", or "frame"')
+    
     # get data as numpy array
     out = df.values
     # get column labels
@@ -32,17 +46,15 @@ def plot_traces(t, df, input_dir=None):
     plt.figure(figsize=(10, 4))
     for i in range(nlabels):
         # plt.plot(t, out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)
-        plt.plot(out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)
+        plt.plot(t, out[:, i] / np.mean(out[baseline_window[0]:baseline_window[1], i]), label=labels[i], color=colors[i], lw=2)
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5)) 
-    plt.xlabel('Time (min)')
-    plt.xlabel('Frame')
+    plt.xlabel(xlabel)
     plt.ylabel(r'$R/R_{baseline}$')
-    # plt.xlim(0, np.max(t))
-    plt.xlim(0, len(t)-1)
+    plt.xlim(0, t[-1])
     plt.axhline(1, ls='--', c='k', zorder=0)
     # make the xaxis ticks dense (lots of values shown)
     # plt.xticks(np.arange(0, np.max(t)+1, step=0.5))
-    plt.xticks(np.arange(0, len(t)-1, step=50))
+    plt.xticks(np.arange(0, t[-1], step=xtick_step))
     # rotate xticks 45 degrees
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -81,7 +93,9 @@ def main():
     input_dir = sys.argv[1]
     reg_dir = sys.argv[2]
     registered_dir = os.path.join(input_dir, reg_dir)
-    plot_only = sys.argv[3] if len(sys.argv) > 3 else False
+    baseline_window = sys.argv[3] if len(sys.argv) > 3 and isinstance(sys.argv[3], tuple) else (0, 60)
+    plot_only = sys.argv[4] if len(sys.argv) > 4 else False
+    time_type = sys.argv[5] if len(sys.argv) > 5 else 'min'
 
     tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
     tif_paths = sorted(tif_paths)[:]
@@ -113,10 +127,10 @@ def main():
         # save labeled columns
         df.columns = labels
         df.to_csv(os.path.join(input_dir, 'quantified.csv'))
-        plot_traces(t, df, input_dir=input_dir)
+        plot_traces(t, df, baseline_window=baseline_window, input_dir=input_dir, time_type=time_type)
         plot_rois(fixed, roi, input_dir=input_dir)
     else:
         df = pd.read_csv(os.path.join(input_dir, 'quantified.csv'), index_col=0)
         t = df.index.values
-        plot_traces(t, df, input_dir=input_dir)
+        plot_traces(t, df, baseline_window=baseline_window, input_dir=input_dir, time_type=time_type)
         plot_rois(fixed, roi, input_dir=input_dir)
