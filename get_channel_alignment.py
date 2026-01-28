@@ -17,7 +17,7 @@ import tqdm  # optional, for progress bar
 # noise_tif = tifffile.imread(noise_path)
 # noise_stack = np.stack([noise_tif] * 41, axis=0).astype(np.float32)
 
-def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim=2):
+def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), zplane_to_keep=(2,-1)):
     """Extracts and preprocesses a specific stack from the ND2 file, returns float32 array with trimmed z-slices."""
 
     if stack_shape[0]==1:
@@ -37,7 +37,12 @@ def get_stack(input_nd2, index, noise_stack, stack_shape=(41, 2, 512, 512), trim
     if stack_shape[0]==1:
         return denoised
     else:
-        return denoised[:-trim]
+        start, end = zplane_to_keep
+
+        if end == -1:
+            return denoised[start:]
+        else:
+            return denoised[start:end+1]
     
 
 def get_3d_rigid_parameter_object(num_resolutions=3):
@@ -159,7 +164,7 @@ def align_channels_3d(stack, parameter_object, log_dir=None, index=None):
 
     return params
 
-def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), align_with_beads=False):
+def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), align_with_beads=False, zplane_to_keep=(2,-1)):
     """Process a single frame index (shear correction + channel alignment)."""
 
     # Use optimized 3D rigid registration parameters
@@ -179,7 +184,7 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
         txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
 
         # beads don't need to be shear corrected, just load the denoised stack
-        stack = get_stack(beads_nd2, index, noise_stack, stack_shape=stack_shape)
+        stack = get_stack(beads_nd2, index, noise_stack, stack_shape=stack_shape, zplane_to_keep=zplane_to_keep)
         stack = np.clip(stack, 0, 4095).astype(np.float32)
 
         params = align_channels_3d(stack, channel_align_parameter_object, 
