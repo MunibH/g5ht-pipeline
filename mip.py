@@ -170,12 +170,14 @@ def main():
     rmax = int(sys.argv[6]) if len(sys.argv) > 6 else 750
     gmax = int(sys.argv[7]) if len(sys.argv) > 7 else 100
     mp4_quality = int(sys.argv[8]) if len(sys.argv) > 8 else 5
+    do_focus = bool(sys.argv[9]) if len(sys.argv) > 9 else False
 
 
     stack_range = range(num_frames) #get_range(input_nd2, stack_length)
     out_dir = os.path.splitext(input_nd2)[0]
     
-    check_focus(out_dir, tif_dir, stack_range)
+    if do_focus:
+        check_focus(out_dir, tif_dir, stack_range)
 
     ##### write_alignment(out_dir, stack_range) # no longer performed during MIP
     write_mip(out_dir, tif_dir, stack_range)
