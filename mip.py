@@ -128,18 +128,21 @@ def write_mip(out_dir, tif_dir, stack_range):
             print(f'{os.path.basename(tif_file)} written to {os.path.basename(mip_path)}')
 
     mip = tifffile.imread(mip_path)
-    gfp_means, rfp_means = np.mean(mip, axis=(2, 3)).T
-    plt.subplot(211)
-    plt.plot(gfp_means, c='C2')
-    plt.xlim(0, len(mip))
-    plt.title(f'Max GFP mean: index {np.argmax(gfp_means)}')
-    plt.subplot(212)
-    plt.plot(rfp_means, c='C3')
-    plt.xlim(0, len(mip))
-    plt.title(f'Max RFP mean: index {np.argmax(rfp_means)}')
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, 'means.png'))
-    plt.close()
+    if len(mip.shape)==3: # for immo images, will be CHW
+        pass
+    else:
+        gfp_means, rfp_means = np.mean(mip, axis=(2, 3)).T
+        plt.subplot(211)
+        plt.plot(gfp_means, c='C2')
+        plt.xlim(0, len(mip))
+        plt.title(f'Max GFP mean: index {np.argmax(gfp_means)}')
+        plt.subplot(212)
+        plt.plot(rfp_means, c='C3')
+        plt.xlim(0, len(mip))
+        plt.title(f'Max RFP mean: index {np.argmax(rfp_means)}')
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, 'means.png'))
+        plt.close()
 
 def make_rgb(frame, rmax, gmax, shape=(512, 512, 3)):
     """Creates an RGB image from a frame."""

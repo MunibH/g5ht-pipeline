@@ -76,7 +76,7 @@ def shear_correct(stack, parameter_object):
         output[i] = gfp_reg, rfp_reg
     return output
 
-def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), zplane_to_keep=(2,-1)):
+def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512, 512), zplane_to_keep=(2,-1), skip_shear_correction=False):
     """shear correct a single frame index"""
     tif_path = os.path.join(out_dir, f"{index:04d}.tif")
 
@@ -92,7 +92,11 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
     # shear_correct_parameter_object.AddParameterMap(shear_correct_parameter_map_bspline)
 
     stack = get_stack(input_nd2, index, noise_stack, stack_shape, zplane_to_keep)
-    shear_corrected = shear_correct(stack, shear_correct_parameter_object)
+    if skip_shear_correction:
+        shear_corrected = stack
+    else:
+        shear_corrected = shear_correct(stack, shear_correct_parameter_object)
+
     shear_corrected = np.clip(shear_corrected, 0, 4095).astype(np.uint16)
     tifffile.imwrite(tif_path, shear_corrected, imagej=True)
 
@@ -111,6 +115,7 @@ def main():
     n_workers = int(sys.argv[6]) if sys.argv[6].lower() != 'all' else 10
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
+    skip_shear_correction = sys.argv[11] if len(sys.argv) > 11 else False
 
     out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
     # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
@@ -124,7 +129,7 @@ def main():
 
     with Pool(processes=n_workers) as pool:
         for _ in tqdm.tqdm(pool.imap_unordered(
-                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape),
+                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape, skip_shear_correction=skip_shear_correction),
                 indices),
                 total=len(indices)):
             pass
