@@ -7,7 +7,6 @@ import glob
 from skimage import measure
 import os
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 from functools import partial
 
 import matplotlib
@@ -71,39 +70,28 @@ def main():
     h_binned = h // binning_factor
     w_binned = w // binning_factor
     
-    # Initialize output array for all timepoints: (T, Z, H_binned, W_binned)
-    normalized_gfp = np.zeros((len(tif_paths), z_slices, h_binned, w_binned))
-    normalized_rfp = np.zeros((len(tif_paths), z_slices, h_binned, w_binned))
+    # Initialize output array for GFP only: (T, Z, H_binned, W_binned)
+    # Use float32 to reduce memory usage
+    normalized_gfp = np.zeros((len(tif_paths), z_slices, h_binned, w_binned), dtype=np.float32)
+    # For RFP, only store the running sum to compute mean (saves ~17 GiB)
+    rfp_sum = np.zeros((z_slices, h_binned, w_binned), dtype=np.float64)  # Use float64 for accumulation precision
     
-    # Prepare arguments for parallel processing
-    process_args = [(tif_path, z_slices, h_binned, w_binned, binning_factor) 
-                    for tif_path in tif_paths]
+    # Process files sequentially (was doing this in parallel, but ran into memory issues)
+    print(f"Processing {len(tif_paths)} files")
     
-    # Use multiprocessing to parallelize file processing
-    n_workers = min(cpu_count(), len(tif_paths))
-    print(f"Processing {len(tif_paths)} files using {n_workers} workers...")
-    
-    with Pool(n_workers) as pool:
-        results = list(tqdm(
-            pool.imap(process_single_tif, process_args),
-            total=len(tif_paths),
-            desc="Processing stacks"
-        ))
-    
-    # Unpack results
-    for i, (gfp, rfp) in enumerate(results):
+    for i, tif_path in enumerate(tqdm(tif_paths, desc="Processing stacks")):
+        args = (tif_path, z_slices, h_binned, w_binned, binning_factor)
+        gfp, rfp = process_single_tif(args)
         normalized_gfp[i] = gfp
-        normalized_rfp[i] = rfp
+        rfp_sum += rfp  # Accumulate RFP for mean calculation
+    
+    # Compute RFP mean from accumulated sum
+    rfp_mean = (rfp_sum / len(tif_paths)).astype(np.float32)
     
     # Create mask for voxels that are 0 in GFP channel (should remain 0 throughout)
     zero_mask = normalized_gfp == 0
-        
-    # now normalize data so that it is F/F10, where F10 is the 10th percentile of the entire time series for each voxel
-    # F10 = np.percentile(normalized_data, 10, axis=0)
-    # normalized_data = normalized_data / (F10 + 1e-6)
 
     # Ratiometric normalization: divide channel 0 by channel 1's mean across time
-    rfp_mean = normalized_rfp.mean(axis=0)  # Mean across time for channel 1
     normalized_data = np.divide(normalized_gfp, rfp_mean, out=np.zeros_like(normalized_gfp), where=rfp_mean!=0)
     # # baseline normalize by each voxel's mean over first 60 time points to get F/F_baseline
     baseline = normalized_data[baseline_window[0]:baseline_window[1]].mean(axis=0)
