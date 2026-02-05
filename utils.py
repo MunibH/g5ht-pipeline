@@ -81,11 +81,11 @@ def default_plt_params():
             'size'   : 15}
     matplotlib.rc('font', **font)
 
-def pretty_plot(figsize=(6,4), tick_dir='out', tick_length=5, tick_width=1, spine_width=0.5, fontsize=15, top_border=False, right_border=False):
+def pretty_plot(figsize=(6,4), tick_dir='out', tick_length=5, tick_width=1, spine_width=0.75, fontsize=20, top_border=False, right_border=False):
     plt.rcParams['font.family'] = 'Arial'
     plt.rcParams.update({'font.size': fontsize})
     plt.rcParams['svg.fonttype'] = 'none'
-    fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
     ax.tick_params(direction=tick_dir, length=tick_length, width=tick_width)
     for spine in ax.spines.values():
         spine.set_linewidth(spine_width)
@@ -94,4 +94,5 @@ def pretty_plot(figsize=(6,4), tick_dir='out', tick_length=5, tick_width=1, spin
     if not right_border:
         ax.spines['right'].set_visible(False)
 
-    return plt, ax
+    plt.tight_layout()
+    return fig, ax
