@@ -1,0 +1,49 @@
+# Dataset paths - one ND2 file per line
+# Lines starting with # are comments
+# Empty lines are ignored
+
+# PROCESSED
+
+# UNPROCESSED
+
+/orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251031/date-20251031_time-1000_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251031/date-20251031_time-1000_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251103/date-20251103_time-0900_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251104/date-20251104_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251104/date-20251104_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251104/date-20251104_strain-ISg5HT_condition-fedpatch_worm003.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251106/date-20251106_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251106/date-20251106_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251107/date-20251107_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251107/date-20251107_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251107/date-20251107_strain-ISg5HT_condition-fedpatch_worm003.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251112/date-20251112_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251112/date-20251112_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251121/date-20251121_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251121/date-20251121_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251219/date-20251219_strain-ISg5HT_condition-fedpatch_worm011.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251219/date-20251219_strain-ISg5HT_condition-fedpatch_worm012.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-starvedpatch_worm003.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-starvedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-starvedpatch_worm005.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251224/date-20251224_strain-ISg5HT-ADF-TeTx_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251224/date-20251224_strain-ISg5HT-ADF-TeTx_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251224/date-20251224_strain-ISg5HT-ADF-TeTx_condition-fedpatch_worm003.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251230/date-20251230_strain-ISg5HT-ADF-TeTx_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20251230/date-20251230_strain-ISg5HT-ADF-TeTx_condition-fedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm002.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm003.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm005.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260114/date-20260114_strain-ISg5HT_condition-starvedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260120/date-20260120_strain-ISg5HT_condition-starvedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260123/date-20260123_strain-ISg5HT-nsIS180_condition-fedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260123/date-20260123_strain-ISg5HT-nsIS180_condition-fedpatch_worm005.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm002.nd2

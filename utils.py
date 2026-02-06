@@ -1,5 +1,7 @@
 # uses g5ht-pipeline conda env
 
+from pathlib import PurePosixPath
+import subprocess
 from nd2reader import ND2Reader
 import numpy as np
 import itk
@@ -71,6 +73,32 @@ def get_beads_alignment_file(input_nd2):
         return None
     else:
         return beads_file
+    
+def scp_from_flvc(filename, data_dir_flvc, data_dir_local, flvc):
+    
+    # 1. Handle Local Path (Standard Windows style)
+    date_str = filename.split('_')[0].split('-')[1]
+    local_dir = data_dir_local / date_str
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. Handle Remote Path (Force Linux/Posix style)
+    remote_path = PurePosixPath(data_dir_flvc) / date_str / filename
+
+    # 3. Check if remote file exists
+    ssh_command = f'ssh {flvc} "test -e {remote_path}"'
+    print(ssh_command)
+    
+    result = subprocess.run(ssh_command, shell=True, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Remote file not found or error: {result.stderr}")
+        return
+
+    # 4. Transfer using scp (available on Windows via OpenSSH)
+    print(f"Transferring {filename} to {local_dir}...")
+    scp_command = f'scp "{flvc}:{remote_path}" "{local_dir}"'
+    print(scp_command)
+    subprocess.run(scp_command, shell=True, check=True)
+
 
 
 # utils for plotting data
