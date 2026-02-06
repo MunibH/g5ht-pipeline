@@ -21,4 +21,5 @@ dependencies:
       - h5py
       - hdf5plugin
       - scikit-learn
+      - opencv-python
 
