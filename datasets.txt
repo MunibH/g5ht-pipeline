@@ -3,7 +3,7 @@
 # Empty lines are ignored
 
 # BEGAN PROCESSING BUT DIDN'T FINISH
-/orcd/data/flavell/001/g5ht/DATA/20251104/date-20251104_strain-ISg5HT_condition-fedpatch_worm003.nd2 (need to transfer to flvc): most of the zstack goes out of focus prior to worm hitting food, not easy to register
+/orcd/data/flavell/001/g5ht/DATA/20251104/date-20251104_strain-ISg5HT_condition-fedpatch_worm003.nd2 (transferred back to flvc): most of the zstack goes out of focus prior to worm hitting food, not easy to register
 
 # PROCESSED
 /orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (transferred back to flvc)
