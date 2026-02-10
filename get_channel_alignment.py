@@ -174,36 +174,45 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
     log_dir = os.path.join(out_dir, "elastix_logs")
     os.makedirs(log_dir, exist_ok=True)
 
-    if align_with_beads:
-        beads_nd2 = input_nd2
-        beads_pth = out_dir
+    try:
 
-        os.makedirs(beads_pth, exist_ok=True)
-        txt_pth = os.path.join(beads_pth, "txt")
-        os.makedirs(txt_pth, exist_ok=True)
-        txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
+        if align_with_beads:
+            beads_nd2 = input_nd2
+            beads_pth = out_dir
 
-        # beads don't need to be shear corrected, just load the denoised stack
-        stack = get_stack(beads_nd2, index, noise_stack, stack_shape=stack_shape, zplane_to_keep=zplane_to_keep)
-        stack = np.clip(stack, 0, 4095).astype(np.float32)
+            os.makedirs(beads_pth, exist_ok=True)
+            txt_pth = os.path.join(beads_pth, "txt")
+            os.makedirs(txt_pth, exist_ok=True)
+            txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
 
-        params = align_channels_3d(stack, channel_align_parameter_object, 
-                                   log_dir=log_dir, index=index)
-        params.WriteParameterFile(params, txt_fn)
+            # beads don't need to be shear corrected, just load the denoised stack
+            stack = get_stack(beads_nd2, index, noise_stack, stack_shape=stack_shape, zplane_to_keep=zplane_to_keep)
+            stack = np.clip(stack, 0, 4095).astype(np.float32)
 
-    else:
-        shear_correct_pth = os.path.join(out_dir, "shear_corrected")
-        shear_correct_fn = os.path.join(shear_correct_pth, f"{index:04d}.tif")
+            params = align_channels_3d(stack, channel_align_parameter_object, 
+                                    log_dir=log_dir, index=index)
+            params.WriteParameterFile(params, txt_fn)
 
-        txt_pth = os.path.join(out_dir,"txt")
-        os.makedirs(txt_pth, exist_ok=True)
-        txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
+        else:
+            shear_correct_pth = os.path.join(out_dir, "shear_corrected")
+            shear_correct_fn = os.path.join(shear_correct_pth, f"{index:04d}.tif")
 
-        shear_corrected = tifffile.imread(shear_correct_fn).astype(np.float32)
+            txt_pth = os.path.join(out_dir,"txt")
+            os.makedirs(txt_pth, exist_ok=True)
+            txt_fn = os.path.join(txt_pth, f"{index:04d}.txt")
 
-        params = align_channels_3d(shear_corrected, channel_align_parameter_object,
-                                   log_dir=log_dir, index=index)
-        params.WriteParameterFile(params, txt_fn)
+            shear_corrected = tifffile.imread(shear_correct_fn).astype(np.float32)
+
+            params = align_channels_3d(shear_corrected, channel_align_parameter_object,
+                                    log_dir=log_dir, index=index)
+            params.WriteParameterFile(params, txt_fn)
+
+    except Exception as e:
+        print(f"Error processing index {index}: {e}")
+        # # Optionally, write an empty parameter file to indicate failure
+        # with open(txt_fn, 'w') as f:
+        #     f.write("# Registration failed\n")
+        #     f.write(f"# Error: {e}\n")
 
 def main():
     """
