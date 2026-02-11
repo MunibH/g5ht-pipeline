@@ -8,11 +8,11 @@
 # PROCESSED
 /orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (transferred back to flvc)
 /orcd/data/flavell/001/g5ht/DATA/20251028/date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm002.nd2 (transferred back to flvc)
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm003.nd2 (transferred back to flvc)
 
 # UNPROCESSED
 
-/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm003.nd2 (processing now)
-/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm004.nd2 (processing now)
 /orcd/data/flavell/001/g5ht/DATA/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm005.nd2
 
 /orcd/data/flavell/001/g5ht/DATA/20251107/date-20251107_strain-ISg5HT_condition-fedpatch_worm003.nd2

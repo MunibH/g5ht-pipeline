@@ -108,6 +108,7 @@ def main():
     print(f"Binning factor: {binning_factor}")
     
     # Save the normalized data, rfp_mean, gfp_mean, baseline in a npy file
+    print('Saving normalized data (ratiometric) to npy file...')
     np.save(os.path.join(input_dir, 'normalized_voxels.npy'), normalized_data)
     np.save(os.path.join(input_dir, 'rfp_mean.npy'), rfp_mean)
     np.save(os.path.join(input_dir, 'gfp_mean.npy'), normalized_gfp.mean(axis=0))

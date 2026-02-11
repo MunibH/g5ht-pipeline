@@ -228,14 +228,18 @@ def main():
     n_workers = int(sys.argv[6]) if len(sys.argv) > 6 else cpu_count()
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
-    align_with_beads = int(sys.argv[11]) if len(sys.argv) > 11 else False
+    every_other = int(sys.argv[11]) if len(sys.argv) > 11 else False
+    align_with_beads = int(sys.argv[12]) if len(sys.argv) > 12 else False
 
     out_dir = os.path.splitext(input_nd2)[0]
 
     noise_stack = utils.get_noise_stack(noise_pth)
 
     # --- prepare parallel job list ---
-    indices = list(range(start_idx, end_idx + 1))
+    if every_other:
+        indices = list(range(start_idx, end_idx + 1, 2))
+    else:
+        indices = list(range(start_idx, end_idx + 1))
     print(f"Processing {len(indices)} stacks ({start_idx}-{end_idx}) using {n_workers} workers...")
 
     with Pool(processes=n_workers) as pool:
