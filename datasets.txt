@@ -21,6 +21,9 @@
 
 /orcd/data/flavell/001/g5ht/DATA/20251107/date-20251107_strain-ISg5HT_condition-fedpatch_worm003.nd2 (processing)
 
+/orcd/data/flavell/001/g5ht/DATA/20260206/date-20260206_strain-ISg5HT-mod-5_condition-fedpatch_worm001.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260206/date-20260206_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2
+
 /orcd/data/flavell/001/g5ht/DATA/20251112/date-20251112_strain-ISg5HT_condition-fedpatch_worm002.nd2
 /orcd/data/flavell/001/g5ht/DATA/20251219/date-20251219_strain-ISg5HT_condition-fedpatch_worm011.nd2
 /orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-fedpatch_worm001.nd2
@@ -43,9 +46,3 @@
 /orcd/data/flavell/001/g5ht/DATA/20260127/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2
 
 
-
-# TO ADD TO LIST
-mod-5 worms that albert recorded (not sure where they are, might still be on engaging)
-
-20260206	001	1455	IS[eft-3::g5HT3.0]; mod-5
-20260206	003	1550	IS[eft-3::g5HT3.0]; mod-5
