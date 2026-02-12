@@ -82,7 +82,12 @@ def main():
         if len(largest) == 0:
             nodes = []
         else:
-            nodes = follow_nodes(largest)
+            try:
+                nodes = follow_nodes(largest)
+            except Exception as e:
+                print(f"Error processing frame {i}: {e}")
+                print('Setting nodes to empty list for this frame.')
+                nodes = []  
 
         #writes to outputs
         dilated_label[i] = dilated_seg
@@ -94,4 +99,3 @@ def main():
     tif.imwrite(os.path.join(label_path, 'spline.tif'), visualization)
     with open(os.path.join(label_path, 'spline.json'), 'w') as f:
         json.dump(spline_dict, f, indent=4)
-
