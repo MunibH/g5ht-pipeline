@@ -6,6 +6,115 @@ function bin(timestamps, cutoff=0)
     timestamps .> mean(timestamps)
 end
 
+"""
+    estimate_confocal_stack(path_h5; verbose=true) -> Int
+
+Automatically estimate the CONFOCAL_STACK parameter (number of laser on/off
+cycles per confocal volume) by analyzing the gap pattern in the DAQ laser signal.
+
+Within a volume, laser cycles (one per z-slice) are tightly spaced.
+Between volumes, there's a larger "flyback" gap while the objective resets.
+This function detects those gaps and counts cycles per volume.
+
+Returns the estimated number of laser cycles per confocal volume.
+
+Examples:
+  - Albert's early recordings: returns ~11  (11 z-slices × 1 cycle/slice)
+  - Munib's recordings:  returns ~441 (41 z-slices × ~11 cycles/slice)
+"""
+function estimate_confocal_stack(path_h5::String; verbose::Bool=true)
+    h5f = h5open(path_h5, "r")
+    confocal_timestamps = Float64.(read(h5f, "daqmx_ai")[:, 1])
+    close(h5f)
+
+    confocal_bin = bin(confocal_timestamps)
+
+    # Get all individual laser on/off transitions
+    list_on  = findall(diff(confocal_bin) .== 1) .+ 1
+    list_off = findall(diff(confocal_bin) .== -1) .+ 1
+    n_cycles = minimum([length(list_on), length(list_off)])
+
+    if n_cycles < 2
+        error("Too few laser cycles detected ($n_cycles). Check daqmx_ai data.")
+    end
+
+    # Compute gaps between consecutive cycles (end of cycle i → start of cycle i+1)
+    gaps = [list_on[i+1] - list_off[i] for i in 1:n_cycles-1]
+
+    # --- Find the natural break between intra-volume and inter-volume gaps ---
+    #
+    # The gap distribution can be trimodal (e.g. Munib's scope: 41 z-slices × 11
+    # cycles/slice = 441 cycles/volume):
+    #   Mode 1: tiny gaps between laser cycles within a z-slice
+    #   Mode 2: medium gaps between z-slices within a volume
+    #   Mode 3: large gaps between volumes (piezo flyback)
+    #
+    # We need to find the break before Mode 3 (the largest gaps).
+    # Strategy: sort all gaps, then find the largest ratio between consecutive
+    # sorted values in the upper portion. The inter-volume flyback gaps are
+    # typically an order of magnitude larger than any intra-volume gap.
+    sorted_gaps = sort(gaps)
+    n = length(sorted_gaps)
+
+    # Search from the 90th percentile upward for the biggest ratio jump
+    search_start = max(1, div(n * 9, 10))
+
+    best_ratio = 1.0
+    best_idx = n
+    for i in search_start:n-1
+        if sorted_gaps[i] > 0
+            ratio = Float64(sorted_gaps[i+1]) / Float64(sorted_gaps[i])
+            if ratio > best_ratio
+                best_ratio = ratio
+                best_idx = i
+            end
+        end
+    end
+
+    if best_ratio < 1.5
+        @warn "No clear break between intra-volume and inter-volume gaps " *
+              "(best ratio = $(round(best_ratio, digits=2))). " *
+              "Gap range: $(minimum(gaps)) to $(maximum(gaps)). Defaulting to stack=1."
+        return 1
+    end
+
+    # Threshold is midway between the largest intra-volume gap and smallest inter-volume gap
+    threshold = (sorted_gaps[best_idx] + sorted_gaps[best_idx + 1]) / 2.0
+
+    # Find volume boundaries (large gaps above threshold)
+    volume_breaks = findall(gaps .> threshold)
+
+    if isempty(volume_breaks)
+        @warn "No volume boundaries found with threshold=$threshold. Defaulting to stack=1."
+        return 1
+    end
+
+    # Count cycles per volume (include the last partial volume)
+    break_positions = vcat(0, volume_breaks)
+    cycles_per_volume = diff(break_positions)
+    push!(cycles_per_volume, n_cycles - volume_breaks[end])  # last volume
+
+    n_volumes = length(cycles_per_volume)
+    stack = Int(round(median(cycles_per_volume)))
+
+    if verbose
+        println("Auto-detected CONFOCAL_STACK:")
+        println("  Total laser cycles:              $n_cycles")
+        println("  Detected confocal volumes:       $n_volumes")
+        println("  Cycles per volume (median):      $stack")
+        println("  Cycles per volume range:         $(minimum(cycles_per_volume)) — $(maximum(cycles_per_volume))")
+        println("  Gap ratio at break:              $(round(best_ratio, digits=1))×")
+        println("  Largest intra-volume gap:        $(sorted_gaps[best_idx]) samples")
+        println("  Smallest inter-volume gap:       $(sorted_gaps[best_idx+1]) samples")
+    end
+
+    if maximum(cycles_per_volume) - minimum(cycles_per_volume) > 2
+        @warn "Cycles per volume varies: $(sort(unique(cycles_per_volume))). Using median=$stack."
+    end
+
+    return stack
+end
+
 #used in make_confocal_to_nir()
 function get_stacks(camera_bin, stack=1)
     list_on = findall(diff(camera_bin) .== 1) .+ 1

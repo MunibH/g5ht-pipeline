@@ -45,6 +45,7 @@ def main():
     reg_dir = sys.argv[2]
     binning_factor = int(sys.argv[3]) if len(sys.argv) > 3 else 4
     baseline_window = sys.argv[4] if len(sys.argv) > 4 and isinstance(sys.argv[4], tuple) else (0, 60)
+    fps = float(sys.argv[5]) if len(sys.argv) > 5 else 1/0.533
     
     registered_dir = os.path.join(input_dir, reg_dir)
 
@@ -52,7 +53,11 @@ def main():
     # sort 
     tif_paths = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
     
-    
+    # get frame index from filename (assuming format like 'path/to/file/0001.tif')
+    tif_fns = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
+    frame_vec = [int(os.path.basename(fn).split('.')[0]) for fn in tif_fns]
+    # make a time vector
+    time_vec = np.array(frame_vec) / fps
     
     # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
     # load each tif, and perform binning, create a (time, z, height, width) array
@@ -102,15 +107,17 @@ def main():
     
     # Ensure voxels that were originally 0 remain 0
     normalized_data[zero_mask] = 0
+
+    r_rbaseline = normalized_data.copy()
     
     # Now normalized_data is (T, Z, H, W) array ready for further processing
     print(f"Processed data shape: {normalized_data.shape}")
     print(f"Binning factor: {binning_factor}")
     
     # Save the normalized data, rfp_mean, gfp_mean, baseline in a npy file
-    print('Saving normalized data (ratiometric) to npy file...')
-    np.save(os.path.join(input_dir, 'normalized_voxels.npy'), normalized_data)
+    print('Saving r/r0 to npy file...')
+    np.save(os.path.join(input_dir, 'r_r0.npy'), r_rbaseline)
     np.save(os.path.join(input_dir, 'rfp_mean.npy'), rfp_mean)
     np.save(os.path.join(input_dir, 'gfp_mean.npy'), normalized_gfp.mean(axis=0))
     np.save(os.path.join(input_dir, 'baseline.npy'), baseline)
-    print(f"Saved normalized data (ratiometric) to {os.path.join(input_dir, 'normalized_voxels.npy')}")
+    print(f"Saved r/r0 to {os.path.join(input_dir, 'r_r0.npy')}")
