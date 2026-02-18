@@ -4,14 +4,11 @@ from pathlib import PurePosixPath
 import subprocess
 from nd2reader import ND2Reader
 import numpy as np
-import itk
-import sys
 import os
 import tifffile
 import warnings; warnings.filterwarnings('ignore', category=UserWarning, module='itk')
 import matplotlib.pyplot as plt
 import matplotlib
-import glob
 
 # utils for loading and preprocessing data
 

@@ -11,6 +11,9 @@ The setup script is also here but I definitely don't recommend running it one a 
 
 Alex might also be able to give you advice on best practices to set it up. I think he sets up most people's in lab c4 etc for them
 
+### USAGE
+run behav_pipeline.jl.ipynb
+then run python stuff
 
 ### Julia packages
 
