@@ -22,7 +22,7 @@
 
 # UNPROCESSED
 
-
+/orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm003.nd2 (processing)
 
 /orcd/data/flavell/001/g5ht/DATA/20251112/date-20251112_strain-ISg5HT_condition-fedpatch_worm002.nd2
 /orcd/data/flavell/001/g5ht/DATA/20251219/date-20251219_strain-ISg5HT_condition-fedpatch_worm011.nd2
@@ -45,6 +45,6 @@
 
 /orcd/data/flavell/001/g5ht/DATA/20260127/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2
 
-/orcd/data/flavell/001/g5ht/DATA/20260227/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm003.nd2
-/orcd/data/flavell/001/g5ht/DATA/20260227/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2
-/orcd/data/flavell/001/g5ht/DATA/20260227/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2
+
+/orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2
