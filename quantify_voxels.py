@@ -1,3 +1,4 @@
+import h5py
 import tifffile
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,8 @@ from skimage import measure
 import os
 from tqdm import tqdm
 from functools import partial
+import h5py
+
 
 import matplotlib
 font = {'family' : 'DejaVu Sans',
@@ -45,6 +48,7 @@ def main():
     reg_dir = sys.argv[2]
     binning_factor = int(sys.argv[3]) if len(sys.argv) > 3 else 4
     baseline_window = sys.argv[4] if len(sys.argv) > 4 and isinstance(sys.argv[4], tuple) else (0, 60)
+    fps = float(sys.argv[5]) if len(sys.argv) > 5 else 1/0.533
     
     registered_dir = os.path.join(input_dir, reg_dir)
 
@@ -52,7 +56,11 @@ def main():
     # sort 
     tif_paths = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
     
-    
+    # get frame index from filename (assuming format like 'path/to/file/0001.tif')
+    tif_fns = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
+    frame_vec = [int(os.path.basename(fn).split('.')[0]) for fn in tif_fns]
+    # make a time vector
+    time_vec = np.array(frame_vec) / fps
     
     # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
     # load each tif, and perform binning, create a (time, z, height, width) array
@@ -102,14 +110,43 @@ def main():
     
     # Ensure voxels that were originally 0 remain 0
     normalized_data[zero_mask] = 0
+
+    r_rbaseline = normalized_data.copy()
     
     # Now normalized_data is (T, Z, H, W) array ready for further processing
     print(f"Processed data shape: {normalized_data.shape}")
     print(f"Binning factor: {binning_factor}")
     
-    # Save the normalized data, rfp_mean, gfp_mean, baseline in a npy file
-    np.save(os.path.join(input_dir, 'normalized_voxels.npy'), normalized_data)
-    np.save(os.path.join(input_dir, 'rfp_mean.npy'), rfp_mean)
-    np.save(os.path.join(input_dir, 'gfp_mean.npy'), normalized_gfp.mean(axis=0))
-    np.save(os.path.join(input_dir, 'baseline.npy'), baseline)
-    print(f"Saved normalized data (ratiometric) to {os.path.join(input_dir, 'normalized_voxels.npy')}")
+    # # Save the normalized data, rfp_mean, gfp_mean, baseline in a npy file
+    # print('Saving r/r0 to npy file...')
+    # np.save(os.path.join(input_dir, 'r_r0.npy'), r_rbaseline)
+    # np.save(os.path.join(input_dir, 'rfp_mean.npy'), rfp_mean)
+    # np.save(os.path.join(input_dir, 'gfp_mean.npy'), normalized_gfp.mean(axis=0))
+    # np.save(os.path.join(input_dir, 'baseline.npy'), baseline)
+    # print(f"Saved r/r0 to {os.path.join(input_dir, 'r_r0.npy')}")
+
+    # load mask with metadata (it was saved to tif as tifffile.imwrite(roi_pth, roi.astype(np.uint8), imagej=True, metadata={'Labels': roi_labels}))
+    roi = tifffile.imread(os.path.join(input_dir, 'roi.tif'))
+    with tifffile.TiffFile(os.path.join(input_dir, 'roi.tif')) as tif:
+        labels = tif.imagej_metadata['Labels']
+
+    # load fixed mask
+    fixed_fn = glob.glob(os.path.join(input_dir, 'fixed_mask_[0-9][0-9][0-9][0-9]*.tif'))[0]
+    fixed_mask = tifffile.imread(fixed_fn)
+
+    # save all data in a .h5 file
+    print('Saving r/r0, roi, and fixed mask to h5 file...')
+    with h5py.File(os.path.join(input_dir, f'{os.path.basename(input_dir)}_processed_voxels.h5'), 'w') as f:
+        f.create_dataset('r_r0', data=r_rbaseline, compression='gzip')
+        f.create_dataset('rfp_mean', data=rfp_mean, compression='gzip')
+        f.create_dataset('gfp_mean', data=normalized_gfp.mean(axis=0), compression='gzip')
+        f.create_dataset('baseline', data=baseline, compression='gzip')
+        f.create_dataset('time_vec', data=time_vec, compression='gzip')
+        f.create_dataset('frame_vec', data=frame_vec, compression='gzip')
+        f.create_dataset('binning_factor', data=binning_factor)
+        f.create_dataset('fps', data=fps)
+        f.create_dataset('baseline_window', data=baseline_window)
+        f.create_dataset('roi', data=roi, compression='gzip')
+        f.create_dataset('roi_labels', data=labels)
+        f.create_dataset('fixed_mask', data=fixed_mask, compression='gzip')
+    print("Done")

@@ -48,7 +48,7 @@ def initialize_tform(spline_data, nose_len=100, body_len=400):
     tform.estimate(src, pts)
     return tform
 
-def mask_warp(mask, form):
+def mask_warp(mask, tform):
     return transform.warp(mask, tform, output_shape=(200, 500), order=0)
 
 # load spline pts and initialize transform
@@ -62,7 +62,7 @@ def main():
     # print('Done initalizing transform!')
 
     # load stack and warp in parallel
-    stack_pth = os.path.join(out_dir,'channel_aligned',f'{index:04d}.tif')
+    stack_pth = os.path.join(out_dir,'bleach_corrected',f'{index:04d}.tif')
     stack = tifffile.imread(stack_pth).astype(np.float32)
 
     def slice_warp(index):

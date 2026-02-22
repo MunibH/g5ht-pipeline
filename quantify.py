@@ -43,6 +43,11 @@ def plot_traces(t, df, baseline_window=(0, 60), input_dir=None, time_type='min')
     labels = df.columns.tolist()
     nlabels = out.shape[1]
 
+    # sort labels, and corresponding data and colors, by label name
+    sorted_indices = np.argsort(labels)
+    labels = [labels[i] for i in sorted_indices]
+    out = out[:, sorted_indices]
+
     plt.figure(figsize=(10, 4))
     for i in range(nlabels):
         # plt.plot(t, out[:, i] / np.mean(out[:60, i]), label=labels[i], color=colors[i], lw=2)

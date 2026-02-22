@@ -20,7 +20,9 @@ def check_files(align_dir, stack_range, extension):
     expected_files = {os.path.join(align_dir, f'{i:04d}.{extension}') for i in stack_range}
     if missing_files := expected_files - existing_files:
         stacks = sorted([int(os.path.splitext(os.path.basename(f))[0]) for f in missing_files])
-        raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
+        # raise FileNotFoundError(f"Missing .{extension} files: {','.join([str(i) for i in stacks])}")
+        print(f"Warning: Missing .{extension} files: {','.join([str(i) for i in stacks])}")
+        expected_files = existing_files
 
     return sorted(expected_files, key=extract_frame_from_path)
 
@@ -53,7 +55,10 @@ def write_median_alignment(align_dir, stack_range):
         # Extract parameters from all registration files
         all_params = []
         for file in alignment_files:
-            params = get_transform_params(file, parameter_object)
+            try:
+                params = get_transform_params(file, parameter_object)
+            except:
+                'a'
             all_params.append(params)
         
         # Get the number of transform parameters (6 for 3D EulerTransform)

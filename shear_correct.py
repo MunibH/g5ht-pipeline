@@ -115,7 +115,8 @@ def main():
     n_workers = int(sys.argv[6]) if sys.argv[6].lower() != 'all' else 10
     num_frames, height, width, num_channels = int(sys.argv[7]), int(sys.argv[8]), int(sys.argv[9]), int(sys.argv[10])
     stack_shape = (stack_length,num_channels,height,width)
-    skip_shear_correction = sys.argv[11] if len(sys.argv) > 11 else False
+    z2keep = sys.argv[11] if len(sys.argv) > 11 else (2,-1)
+    skip_shear_correction = sys.argv[12] if len(sys.argv) > 12 else False
 
     out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
     # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
@@ -129,7 +130,7 @@ def main():
 
     with Pool(processes=n_workers) as pool:
         for _ in tqdm.tqdm(pool.imap_unordered(
-                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape, skip_shear_correction=skip_shear_correction),
+                partial(process_one, input_nd2=input_nd2, noise_stack=noise_stack, out_dir=out_dir, stack_shape=stack_shape, zplane_to_keep=z2keep, skip_shear_correction=skip_shear_correction),
                 indices),
                 total=len(indices)):
             pass

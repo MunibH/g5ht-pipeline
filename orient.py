@@ -11,7 +11,13 @@ import tifffile
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
-def orient_all(last_pt, spline_dict, constrain_frame=None, constrain_nose=None):
+def orient_all(last_pt, spline_dict, constrain_frames=None, constrain_noses=None):
+    # Build a lookup dict for constraint frames
+    constraints = {}
+    if constrain_frames is not None and constrain_noses is not None:
+        for frame, nose in zip(constrain_frames, constrain_noses):
+            constraints[frame] = np.array(nose)
+
     out_dict = {}
     for i in range(len(spline_dict)):
         data = spline_dict[i]
@@ -21,8 +27,8 @@ def orient_all(last_pt, spline_dict, constrain_frame=None, constrain_nose=None):
             out_dict[i] = data
             continue
         # apply constraint if specified
-        if constrain_frame is not None and i == constrain_frame:
-            last_pt = np.array(constrain_nose)
+        if i in constraints:
+            last_pt = constraints[i]
         # determine orientation based on distance to last_pt
         dist_unflipped = np.linalg.norm(data_arr[0] - last_pt)
         dist_flip = np.linalg.norm(data_arr[-1] - last_pt)
@@ -50,13 +56,18 @@ def main():
     # last_pt is represented as (y,x)
     last_pt = [np.clip(int(i), 0, 512) for i in sys.argv[2:4]]
     
-    # optional constraints
-    if len(sys.argv) == 7:
-        constrain_frame = int(sys.argv[4])
-        constrain_nose = [np.clip(int(i), 0, 512) for i in sys.argv[5:7]]
+    # optional constraints: remaining args are triplets of (frame, nose_y, nose_x)
+    extra_args = sys.argv[4:]
+    if len(extra_args) >= 3:
+        constrain_frames = []
+        constrain_noses = []
+        for j in range(0, len(extra_args) - 2, 3):
+            constrain_frames.append(int(extra_args[j]))
+            constrain_noses.append([np.clip(int(extra_args[j+1]), 0, 512),
+                                    np.clip(int(extra_args[j+2]), 0, 512)])
     else:
-        constrain_frame = None
-        constrain_nose = None
+        constrain_frames = None
+        constrain_noses = None
 
     #reads spline
     with open(os.path.join(spline_path,'spline.json'), 'r') as f:
@@ -64,7 +75,7 @@ def main():
     spline_dict = {int(k): v for k, v in spline_dict.items()}
 
     #orients all
-    out_dict = orient_all(last_pt, spline_dict, constrain_frame, constrain_nose)
+    out_dict = orient_all(last_pt, spline_dict, constrain_frames, constrain_noses)
 
     #saves outputs
     with open(os.path.join(spline_path, 'oriented.json'), 'w') as f:
