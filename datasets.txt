@@ -19,10 +19,11 @@
 /orcd/data/flavell/001/g5ht/DATA/20260206/date-20260206_strain-ISg5HT-mod-5_condition-fedpatch_worm001.nd2 (transferred back to flvc)
 /orcd/data/flavell/001/g5ht/DATA/20260206/date-20260206_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2 (transferred back to flvc)
 
+/orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm003.nd2 (need to transfer from labpc to flvc)
 
 # UNPROCESSED
 
-/orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm003.nd2 (processing)
+/orcd/data/flavell/001/g5ht/DATA/20260220/date-20260220_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm008.nd2 (processing on 4TB SSD)
 
 /orcd/data/flavell/001/g5ht/DATA/20251112/date-20251112_strain-ISg5HT_condition-fedpatch_worm002.nd2
 /orcd/data/flavell/001/g5ht/DATA/20251219/date-20251219_strain-ISg5HT_condition-fedpatch_worm011.nd2
@@ -48,3 +49,7 @@
 
 /orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2
 /orcd/data/flavell/001/g5ht/DATA/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2
+
+/orcd/data/flavell/001/g5ht/DATA/20260220/date-20260220_strain-ISg5HT-mod5_condition-starvedpatch_worm005.nd2
+/orcd/data/flavell/001/g5ht/DATA/20260220/date-20260220_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm007.nd2
+

@@ -193,68 +193,6 @@ def detect_confocal_timing_di(di_confocal: np.ndarray
 # detect_nir_timing
 # ---------------------------------------------------------------------------
 
-import numpy as np
-
-
-def detect_nir_timing_v3(di_nir, img_id, q_iter_save, n_img_nir):
-    """Detect NIR (FLIR) camera timing from digital input signals."""
-    # behavior camera - FLIR
-    di_diff = np.diff(di_nir)
-    list_nir_on = np.where(di_diff > 1)[0] + 1
-    list_nir_off = np.where(di_diff < -1)[0] + 1
-    nir_record_on = np.diff(list_nir_on) > 500
-    nir_record_off = np.diff(list_nir_off) > 500
-
-    if list_nir_on[0] > 500:  # no trigger before the first
-        s_nir_start = list_nir_on[0]
-    elif np.sum(nir_record_on) == 2:
-        s_nir_start = list_nir_on[np.argmax(nir_record_on) + 1]
-    else:
-        raise ValueError("more than 2 recording on detected for FLIR camera")
-
-    if list_nir_off[-1] < len(di_nir) - 500:
-        s_nir_stop = list_nir_off[-1]
-    elif np.sum(nir_record_off) <= 2:
-        # findlast equivalent: find the last index where diff > 500
-        indices = np.where(np.diff(list_nir_off) > 500)[0]
-        s_nir_stop = list_nir_off[indices[-1]]
-    else:
-        raise ValueError("more than 2 recording off detected for FLIR camera")
-
-    list_nir_on = list_nir_on[(list_nir_on > s_nir_start - 5) & (list_nir_on < s_nir_stop + 5)]
-    list_nir_off = list_nir_off[(list_nir_off > s_nir_start - 5) & (list_nir_off < s_nir_stop + 5)]
-
-    if len(list_nir_on) != len(list_nir_off):
-        raise ValueError("len(list_nir_on) != len(list_nir_off)")
-
-    img_id_diff = np.diff(img_id)
-    img_id_diff = np.concatenate(([1], img_id_diff))
-    if abs(len(list_nir_on) - np.sum(np.diff(img_id))) > 3:
-        raise ValueError(
-            "the detected trigger count is different from the image id data by more than 3"
-        )
-    else:
-        img_id_diff[-1] += len(list_nir_on) - np.sum(np.diff(img_id)) - 1
-
-    idx_nir_save = []
-    for dn, q_save in zip(img_id_diff, q_iter_save):
-        dn = int(dn)
-        if dn == 1:
-            idx_nir_save.append(q_save)
-        else:
-            idx_nir_save.append(q_save)
-            for _ in range(dn - 1):
-                idx_nir_save.append(False)
-
-    idx_nir_save = np.array(idx_nir_save, dtype=bool)
-
-    if np.sum(idx_nir_save) != n_img_nir:
-        raise ValueError("detected number of NIR frames != saved NIR frames")
-
-    result = np.column_stack((list_nir_on, list_nir_off))
-    return result[idx_nir_save, :]
-
-
 def detect_nir_timing(di_nir: np.ndarray,
                       img_id: np.ndarray,
                       q_iter_save: np.ndarray,
@@ -371,119 +309,119 @@ def detect_nir_timing_from_h5(path_h5: str) -> np.ndarray:
 
     return detect_nir_timing(di_nir, img_id, q_iter_save, n_img_nir)
 
-# def detect_nir_timing_v2(
-#     di_nir: np.ndarray,
-#     img_id: np.ndarray,
-#     q_iter_save: np.ndarray,
-#     n_img_nir: int,
-#     recording_start: int,
-#     recording_stop: int,
-#     tolerance: int = 5,
-# ) -> Tuple[np.ndarray, np.ndarray]:
-#     """Detect NIR frame timing using a known recording window.
+def detect_nir_timing_v2(
+    di_nir: np.ndarray,
+    img_id: np.ndarray,
+    q_iter_save: np.ndarray,
+    n_img_nir: int,
+    recording_start: int,
+    recording_stop: int,
+    tolerance: int = 5,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Detect NIR frame timing using a known recording window.
 
-#     Instead of inferring the recording window from large gaps in the NIR
-#     trigger signal, this version uses explicit ``recording_start`` /
-#     ``recording_stop`` sample indices (e.g. from ai_laser or di_confocal)
-#     to crop the NIR triggers.
+    Instead of inferring the recording window from large gaps in the NIR
+    trigger signal, this version uses explicit ``recording_start`` /
+    ``recording_stop`` sample indices (e.g. from ai_laser or di_confocal)
+    to crop the NIR triggers.
 
-#     Parameters
-#     ----------
-#     di_nir : 1-D array
-#         Digital trigger from NIR (FLIR) camera.
-#     img_id : 1-D array
-#         Image IDs from metadata (monotonically increasing).
-#     q_iter_save : 1-D bool/int array
-#         Whether each acquisition-loop iteration was saved.
-#     n_img_nir : int
-#         Number of NIR images actually saved to disk.
-#     recording_start : int
-#         Sample index where the confocal recording begins.
-#     recording_stop : int
-#         Sample index where the confocal recording ends.
-#     tolerance : int
-#         Slack (samples) around the recording window edges.
+    Parameters
+    ----------
+    di_nir : 1-D array
+        Digital trigger from NIR (FLIR) camera.
+    img_id : 1-D array
+        Image IDs from metadata (monotonically increasing).
+    q_iter_save : 1-D bool/int array
+        Whether each acquisition-loop iteration was saved.
+    n_img_nir : int
+        Number of NIR images actually saved to disk.
+    recording_start : int
+        Sample index where the confocal recording begins.
+    recording_stop : int
+        Sample index where the confocal recording ends.
+    tolerance : int
+        Slack (samples) around the recording window edges.
 
-#     Returns
-#     -------
-#     timing_nir_saved : (n_img_nir, 2) array
-#         ``[nir_on, nir_off]`` sample indices for saved frames only.
-#     timing_nir_all : (n_triggers_in_window, 2) array
-#         ``[nir_on, nir_off]`` for every trigger in the recording window.
-#     """
-#     # ---- 1. Find ALL rising / falling edges in the NIR trigger ----
-#     all_nir_on  = np.where(np.diff(di_nir) >  1)[0] + 1
-#     all_nir_off = np.where(np.diff(di_nir) < -1)[0] + 1
+    Returns
+    -------
+    timing_nir_saved : (n_img_nir, 2) array
+        ``[nir_on, nir_off]`` sample indices for saved frames only.
+    timing_nir_all : (n_triggers_in_window, 2) array
+        ``[nir_on, nir_off]`` for every trigger in the recording window.
+    """
+    # ---- 1. Find ALL rising / falling edges in the NIR trigger ----
+    all_nir_on  = np.where(np.diff(di_nir) >  1)[0] + 1
+    all_nir_off = np.where(np.diff(di_nir) < -1)[0] + 1
 
-#     # ---- 2. Crop to the known recording window ----
-#     mask_on  = (all_nir_on  >= recording_start - tolerance) & (all_nir_on  <= recording_stop + tolerance)
-#     mask_off = (all_nir_off >= recording_start - tolerance) & (all_nir_off <= recording_stop + tolerance)
-#     list_nir_on  = all_nir_on[mask_on]
-#     list_nir_off = all_nir_off[mask_off]
+    # ---- 2. Crop to the known recording window ----
+    mask_on  = (all_nir_on  >= recording_start - tolerance) & (all_nir_on  <= recording_stop + tolerance)
+    mask_off = (all_nir_off >= recording_start - tolerance) & (all_nir_off <= recording_stop + tolerance)
+    list_nir_on  = all_nir_on[mask_on]
+    list_nir_off = all_nir_off[mask_off]
 
-#     # Sanity: equal number of on/off edges
-#     if len(list_nir_on) != len(list_nir_off):
-#         raise ValueError(
-#             f"Unequal on/off edges after cropping: "
-#             f"{len(list_nir_on)} on vs {len(list_nir_off)} off"
-#         )
+    # Sanity: equal number of on/off edges
+    if len(list_nir_on) != len(list_nir_off):
+        raise ValueError(
+            f"Unequal on/off edges after cropping: "
+            f"{len(list_nir_on)} on vs {len(list_nir_off)} off"
+        )
 
-#     n_triggers = len(list_nir_on)
-#     print(f"NIR triggers in recording window: {n_triggers}")
+    n_triggers = len(list_nir_on)
+    print(f"NIR triggers in recording window: {n_triggers}")
 
-#     # ---- 3. Build the save mask from img_id + q_iter_save ----
-#     #   img_id_diff[k] tells how many camera triggers elapsed between
-#     #   iteration k-1 and iteration k.  Usually 1; >1 means triggers
-#     #   fired but were not part of a saved iteration.
-#     img_id_diff = np.diff(img_id).tolist()
-#     img_id_diff.insert(0, 1)                       # first iteration = 1 trigger
-#     total_expected = int(np.sum(np.diff(img_id)))   # total triggers implied by metadata
+    # ---- 3. Build the save mask from img_id + q_iter_save ----
+    #   img_id_diff[k] tells how many camera triggers elapsed between
+    #   iteration k-1 and iteration k.  Usually 1; >1 means triggers
+    #   fired but were not part of a saved iteration.
+    img_id_diff = np.diff(img_id).tolist()
+    img_id_diff.insert(0, 1)                       # first iteration = 1 trigger
+    total_expected = int(np.sum(np.diff(img_id)))   # total triggers implied by metadata
 
-#     mismatch = n_triggers - total_expected
-#     print(f"Triggers detected: {n_triggers},  expected from img_id: {total_expected},  mismatch: {mismatch}")
+    mismatch = n_triggers - total_expected
+    print(f"Triggers detected: {n_triggers},  expected from img_id: {total_expected},  mismatch: {mismatch}")
 
-#     # Absorb any small mismatch into the last img_id_diff entry.
-#     # This accounts for a few extra/missing triggers at the very end.
-#     img_id_diff[-1] += mismatch - 1
+    # Absorb any small mismatch into the last img_id_diff entry.
+    # This accounts for a few extra/missing triggers at the very end.
+    img_id_diff[-1] += mismatch - 1
 
-#     # Ensure the corrected last entry is at least 1
-#     if img_id_diff[-1] < 1:
-#         print(f"  ⚠ Warning: corrected img_id_diff[-1] = {img_id_diff[-1]}, clamping to 1")
-#         img_id_diff[-1] = 1
+    # Ensure the corrected last entry is at least 1
+    if img_id_diff[-1] < 1:
+        print(f"  ⚠ Warning: corrected img_id_diff[-1] = {img_id_diff[-1]}, clamping to 1")
+        img_id_diff[-1] = 1
 
-#     # ---- 4. Expand into a per-trigger boolean mask ----
-#     #   For each acquisition iteration, the first trigger gets q_iter_save;
-#     #   any additional triggers (delta > 1) are marked False (unsaved).
-#     idx_nir_save: list = []
-#     for delta_n, q_save in zip(img_id_diff, q_iter_save):
-#         delta_n = int(delta_n)
-#         idx_nir_save.append(bool(q_save))
-#         if delta_n > 1:
-#             idx_nir_save.extend([False] * (delta_n - 1))
+    # ---- 4. Expand into a per-trigger boolean mask ----
+    #   For each acquisition iteration, the first trigger gets q_iter_save;
+    #   any additional triggers (delta > 1) are marked False (unsaved).
+    idx_nir_save: list = []
+    for delta_n, q_save in zip(img_id_diff, q_iter_save):
+        delta_n = int(delta_n)
+        idx_nir_save.append(bool(q_save))
+        if delta_n > 1:
+            idx_nir_save.extend([False] * (delta_n - 1))
 
-#     # Trim or pad so the mask length matches the trigger count
-#     if len(idx_nir_save) > n_triggers:
-#         print(f"  ⚠ Trimming save mask from {len(idx_nir_save)} to {n_triggers}")
-#         idx_nir_save = idx_nir_save[:n_triggers]
-#     elif len(idx_nir_save) < n_triggers:
-#         print(f"  ⚠ Padding save mask from {len(idx_nir_save)} to {n_triggers} (extra triggers marked unsaved)")
-#         idx_nir_save.extend([False] * (n_triggers - len(idx_nir_save)))
+    # Trim or pad so the mask length matches the trigger count
+    if len(idx_nir_save) > n_triggers:
+        print(f"  ⚠ Trimming save mask from {len(idx_nir_save)} to {n_triggers}")
+        idx_nir_save = idx_nir_save[:n_triggers]
+    elif len(idx_nir_save) < n_triggers:
+        print(f"  ⚠ Padding save mask from {len(idx_nir_save)} to {n_triggers} (extra triggers marked unsaved)")
+        idx_nir_save.extend([False] * (n_triggers - len(idx_nir_save)))
 
-#     idx_nir_save = np.array(idx_nir_save, dtype=bool)
-#     n_saved = int(np.sum(idx_nir_save))
-#     print(f"Saved frames from mask: {n_saved},  expected (n_img_nir): {n_img_nir}")
+    idx_nir_save = np.array(idx_nir_save, dtype=bool)
+    n_saved = int(np.sum(idx_nir_save))
+    print(f"Saved frames from mask: {n_saved},  expected (n_img_nir): {n_img_nir}")
 
-#     if n_saved != n_img_nir:
-#         raise ValueError(
-#             f"Saved frame count mismatch: mask says {n_saved}, "
-#             f"file has {n_img_nir}"
-#         )
+    if n_saved != n_img_nir:
+        raise ValueError(
+            f"Saved frame count mismatch: mask says {n_saved}, "
+            f"file has {n_img_nir}"
+        )
 
-#     # ---- 5. Build output arrays ----
-#     timing_nir_all   = np.column_stack((list_nir_on, list_nir_off))
-#     timing_nir_saved = timing_nir_all[idx_nir_save, :]
+    # ---- 5. Build output arrays ----
+    timing_nir_all   = np.column_stack((list_nir_on, list_nir_off))
+    timing_nir_saved = timing_nir_all[idx_nir_save, :]
 
-#     return timing_nir_saved, timing_nir_all
+    return timing_nir_saved, timing_nir_all
 
 def detect_piezo_timing(ai_piezo: np.ndarray, confocal_start_sample_di: int, confocal_stop_sample_di: int) -> np.ndarray:
     
@@ -540,7 +478,6 @@ def sync_timing(di_confocal: np.ndarray,
     # timing_stack = np.column_stack(detect_confocal_timing(ai_laser))
     timing_stack = np.column_stack(detect_confocal_timing_di(di_confocal))
     timing_nir   = detect_nir_timing(di_nir, img_id, q_iter_save, n_img_nir)
-    # timing_nir   = detect_nir_timing_v3(di_nir, img_id, q_iter_save, n_img_nir)
     timing_piezo = detect_piezo_timing(ai_piezo, timing_stack[0, 0], timing_stack[-1, 1])
 
     confocal_to_nir  = []
@@ -585,7 +522,7 @@ def sync_timing_from_h5(path_h5: str,
     daqmx_ai = _ensure_column_layout(daqmx_ai, 3)
     daqmx_di = _ensure_column_layout(daqmx_di, 2)
 
-    ai_laser = filter_ai_laser(daqmx_ai[:, 0], daqmx_di[:, 0], n_rec)
+    ai_laser = daqmx_ai[:,0] # filter_ai_laser(daqmx_ai[:, 0], daqmx_di[:, 0], n_rec)
     ai_piezo = daqmx_ai[:, 1].astype(np.float32)
     di_nir   = daqmx_di[:, 1].astype(np.float32)
     di_confocal = daqmx_di[:, 0].astype(np.float32)
