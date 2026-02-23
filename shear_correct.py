@@ -118,7 +118,10 @@ def main():
     z2keep = sys.argv[11] if len(sys.argv) > 11 else (2,-1)
     skip_shear_correction = sys.argv[12] if len(sys.argv) > 12 else False
 
-    out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
+    if skip_shear_correction:
+        out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_shear_corrected')
+    else:
+        out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'shear_corrected')
     # out_dir = os.path.join(os.path.splitext(input_nd2)[0], 'not_trimmed')
     os.makedirs(out_dir, exist_ok=True)
 
