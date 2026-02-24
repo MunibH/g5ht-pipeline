@@ -9,6 +9,37 @@ from scipy.ndimage import zoom        # For resizing images using interpolation
 import imageio
 import tqdm
 
+def show_cube_volumetric(volume, colorscale='Greys_r', isomin=100, isomax=500, opacity=0.1, surface_count=20):
+    # 1. Create a 3D coordinate grid (flattened)
+    nx, ny, nz = volume.shape
+    x, y, z = np.mgrid[0:nx, 0:ny, 0:nz]
+
+    fig = go.Figure(data=go.Volume(
+        x=x.flatten(),
+        y=y.flatten(),
+        z=z.flatten(),
+        value=volume.flatten(),
+        isomin=isomin,      # Minimum value to render
+        isomax=isomax,      # Maximum value to render
+        opacity=opacity,     # Global opacity of the volume
+        surface_count=surface_count, # Number of "layers" or isosurfaces
+        colorscale=colorscale,
+        caps=dict(x_show=False, y_show=False, z_show=False) # Hides the outer box faces
+    ))
+
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z',
+            aspectmode='data'
+        ),
+        width=800,
+        height=800
+    )
+    
+    return fig
+
 
 def save_volume_movie(fig, filename='volume_rotation.mp4', fps=20, rotations=1):
     frames = []
@@ -197,53 +228,85 @@ def show_volume_with_rois(volume, roi_volume, labels, plot_roi, colorscale='Grey
 
 if __name__ == "__main__":
 
-    # --- 1. Load Data ---
-    data_path = r'D:\DATA\g5ht-free\20251028\date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001'
-    data_fn = 'fixed_0166.tif'
+
+    # # VISUALIZE FIXED VOLUME WITH ROIS
+    # # --- 1. Load Data ---
+    # data_path = r'D:\DATA\g5ht-free\20251028\date-20251028_time-1500_strain-ISg5HT_condition-starvedpatch_worm001'
+    # data_fn = 'fixed_0166.tif'
+    # data_full_path = os.path.join(data_path, data_fn)
+
+    # z2keep = (2,25)
+    # # z2keep = (18,29)
+    # # z2keep = (12,15)
+
+    # plot_roi = True
+
+    # volume = tifffile.imread(data_full_path)[:,1,:,:] 
+    # volume = volume.astype(np.float32) # Ensure it's float for visualization
+
+    # # --- 2. Manual Downsampling (The 'Skip' Method) ---
+    # # This is faster and keeps ROI integers pure
+    # stride = 3 # This is your 0.25 factor (1/0.25 = 4)
+
+    # # Downsample volume (Red channel)
+    # volume = volume[z2keep[0]:z2keep[1], ::stride, ::stride]
+
+    # # Downsample ROI (Exact same skipping pattern)
+    # roi_volume = tifffile.imread(os.path.join(data_path, 'roi.tif'))
+    # roi_volume = roi_volume[z2keep[0]:z2keep[1], ::stride, ::stride]
+
+    # # Double check shapes match exactly
+    # assert volume.shape == roi_volume.shape, f"Shape mismatch: {volume.shape} vs {roi_volume.shape}"
+
+    # with tifffile.TiffFile(os.path.join(data_path, 'roi.tif')) as tif:
+    #     labels = tif.imagej_metadata['Labels']
+
+    # print(f"Volume shape: {volume.shape}")
+    # print(f"ROI shape: {roi_volume.shape}")
+    # print(f"Labels: {labels}")
+
+    # # Create and display the visualization
+    # print("\nCreating visualization...")
+    # fig = show_volume_with_rois(volume, roi_volume, labels, plot_roi)
+    # save_volume_movie(fig,os.path.join(data_path, 'volume_rotation_with_roi.mp4'))
+    
+    # # fig.show() # uncomment to view interactively in a browser instead of saving a movie
+    
+    
+    # # print("Saving interactive HTML...")
+    # # fig.write_html(os.path.join(data_path, "volume_plot.html"))
+    
+    
+    # plot_roi = False
+    # fig = show_volume_with_rois(volume, roi_volume, labels, plot_roi)
+    # save_volume_movie(fig,os.path.join(data_path, 'volume_rotation.mp4'))
+
+    # # VISUALIZE IMMO VOLUME
+    # visualize 3d volume
+
+
+    data_path = r'D:\DATA\g5ht-immo\20260130\date-20260130_strain-nsIS180-ADFT_condition-immo-azide_worm002\tif'
+    # data_path = r'D:\DATA\g5ht-immo\20260130\date-20260130_strain-ADFT_condition-immo-azide_worm002_V3\tif'
+    data_fn = '0000.tif'
+
     data_full_path = os.path.join(data_path, data_fn)
 
-    z2keep = (2,25)
-    # z2keep = (18,29)
-    # z2keep = (12,15)
+    print("Loading data...")
+    volume = tifffile.imread(data_full_path)[:,1,:,:] # just the red channel
+    # volume = zoom(volume, (3, 1, 1), order=1) # downsample x and y by 2x using linear interpolation
+    volume = zoom(volume, (0.25, 0.25, 0.25), order=1) # downsample x and y by 2x using linear interpolation
 
-    plot_roi = True
+    # volume = volume[0:27,:,:]
 
-    volume = tifffile.imread(data_full_path)[:,1,:,:] 
-    volume = volume.astype(np.float32) # Ensure it's float for visualization
-
-    # --- 2. Manual Downsampling (The 'Skip' Method) ---
-    # This is faster and keeps ROI integers pure
-    stride = 3 # This is your 0.25 factor (1/0.25 = 4)
-
-    # Downsample volume (Red channel)
-    volume = volume[z2keep[0]:z2keep[1], ::stride, ::stride]
-
-    # Downsample ROI (Exact same skipping pattern)
-    roi_volume = tifffile.imread(os.path.join(data_path, 'roi.tif'))
-    roi_volume = roi_volume[z2keep[0]:z2keep[1], ::stride, ::stride]
-
-    # Double check shapes match exactly
-    assert volume.shape == roi_volume.shape, f"Shape mismatch: {volume.shape} vs {roi_volume.shape}"
-
-    with tifffile.TiffFile(os.path.join(data_path, 'roi.tif')) as tif:
-        labels = tif.imagej_metadata['Labels']
 
     print(f"Volume shape: {volume.shape}")
-    print(f"ROI shape: {roi_volume.shape}")
-    print(f"Labels: {labels}")
 
     # Create and display the visualization
     print("\nCreating visualization...")
-    fig = show_volume_with_rois(volume, roi_volume, labels, plot_roi)
-    save_volume_movie(fig,os.path.join(data_path, 'volume_rotation_with_roi.mp4'))
-    
-    # fig.show() # uncomment to view interactively in a browser instead of saving a movie
-    
-    
-    # print("Saving interactive HTML...")
-    # fig.write_html(os.path.join(data_path, "volume_plot.html"))
-    
-    
-    plot_roi = False
-    fig = show_volume_with_rois(volume, roi_volume, labels, plot_roi)
-    save_volume_movie(fig,os.path.join(data_path, 'volume_rotation.mp4'))
+    fig = show_cube_volumetric(volume, colorscale='Reds', isomin=75, isomax=400, opacity=0.2, surface_count=25)
+    fig.show()
+
+    print("\nVisualization controls:")
+    print("- Rotate: Click and drag")
+    print("- Zoom: Scroll wheel")
+    print("- Pan: Right-click and drag")
