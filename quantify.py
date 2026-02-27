@@ -53,6 +53,8 @@ def plot_traces(t, df, baseline_window=(0, 60), input_dir=None, time_type='min',
     # then subtract encounter_value from t to align traces to encounter time (plot at 0)
     # encounter_value should be in the same units as time_type
 
+    lw = 2.5
+
     if time_type == 'min':
         t = t
         xlabel = 'Time (min)'
@@ -93,9 +95,9 @@ def plot_traces(t, df, baseline_window=(0, 60), input_dir=None, time_type='min',
         r_over_baseline = out[:, i] / r_baseline
         r_over_baseline_normed = r_over_baseline / np.max(r_over_baseline)
         if normalize_to_max:
-            ax.plot(t, r_over_baseline_normed, label=labels[i], color=c, lw=3)
+            ax.plot(t, r_over_baseline_normed, label=labels[i], color=c, lw=lw)
         else:
-            ax.plot(t, r_over_baseline, label=labels[i], color=c, lw=3)
+            ax.plot(t, r_over_baseline, label=labels[i], color=c, lw=lw)
     
     if encounter_value is not None:
         ax.axvspan(-3, 3, color='gray', alpha=0.3, label='Encounter')    
