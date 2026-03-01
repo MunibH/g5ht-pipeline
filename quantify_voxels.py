@@ -1,152 +1,305 @@
+"""
+quantify_voxels.py — Ratiometric voxel quantification for dual-channel 5-HT imaging.
+
+Reads registered TIF stacks (GFP + RFP channels), computes the ratiometric
+signal R = GFP / <RFP>_t, NaN-fills bad frames, and saves everything needed
+for downstream analyses (baseline normalization, F/F20, latency, PCA, etc.)
+into a single consolidated .h5 file.
+
+Usage:
+    python quantify_voxels.py <input_dir> <reg_dir> [binning_factor]
+
+Arguments:
+    input_dir       Path to the worm data directory (must contain metadata.json,
+                    roi.tif, and fixed_mask_*.tif).
+    reg_dir         Subdirectory containing registered TIF stacks (e.g.
+                    'registered_elastix').
+    binning_factor  Spatial binning factor (default: 1, no binning).
+
+Output:
+    <input_dir>/<basename>_processed_voxels.h5 with datasets:
+
+    Data arrays
+        ratio           (T, Z, H, W) float32  — R = GFP / <RFP>_t.
+                         Bad frames are NaN-filled.
+        rfp_mean        (Z, H, W)    float32  — time-averaged RFP channel.
+        gfp_mean        (Z, H, W)    float32  — time-averaged GFP channel.
+        baseline        (Z, H, W)    float32  — mean of R over baseline_window.
+                         Absent when baseline_window is not set.
+        f20             (Z, H, W)    float32  — 20th percentile of R across
+                         time (ignoring NaN / bad frames).
+
+    Masks
+        roi             (Z, H, W)    uint8    — ROI label mask (1-indexed).
+        roi_labels      (N,)         str      — ROI label names.
+        fixed_mask      (H, W)       uint8    — 2D worm binary mask.
+
+    Timing / metadata
+        time_vec        (T,)         float64  — time in seconds.
+        frame_index     (T,)         int      — original frame numbers from
+                         TIF filenames.
+        fps             scalar       float    — frames per second.
+        binning_factor  scalar       int      — spatial binning factor.
+        baseline_window (2,)         int      — (start, end) frame indices.
+                         (-1, -1) when not set.
+        encounter_frame scalar       int      — frame of food encounter.
+                         -1 when not set.
+        bad_frames      (N,)         int      — indices of bad frames (can be
+                         empty).
+        nframes         scalar       int      — total number of frames.
+"""
+
+import json
+import sys
+import os
+import glob
+
 import h5py
 import tifffile
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import sys
-import glob
-from skimage import measure
-import os
 from tqdm import tqdm
-from functools import partial
-import h5py
 
 
-import matplotlib
-font = {'family' : 'DejaVu Sans',
-        'weight' : 'normal',
-        'size'   : 15}
-matplotlib.rc('font', **font)
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
+def _process_single_tif(tif_path, z_slices, h_binned, w_binned, binning_factor):
+    """Load a registered TIF and return spatially-binned (GFP, RFP) arrays.
 
-def process_single_tif(args):
-    """Process a single TIF file - designed for parallel execution."""
-    tif_path, z_slices, h_binned, w_binned, binning_factor = args
-    
+    Parameters
+    ----------
+    tif_path : str
+        Path to a single registered TIF file (Z*C, H, W).
+    z_slices : int
+        Number of Z slices (C=2 channels assumed).
+    h_binned, w_binned : int
+        Target spatial dimensions after binning.
+    binning_factor : int
+        Spatial binning factor.
+
+    Returns
+    -------
+    gfp : ndarray (Z, H_binned, W_binned) float32
+    rfp : ndarray (Z, H_binned, W_binned) float32
+    """
     stack = tifffile.imread(tif_path).astype(np.float32).clip(min=0, max=4096)
-    
+
     # Reshape to (Z, 2, H, W) if needed
     if stack.ndim == 3:
         stack = stack.reshape(z_slices, 2, stack.shape[1], stack.shape[2])
-    
-    # Perform binning on spatial dimensions
+
+    # Spatial binning via reshape + mean
     z, c, h, w = stack.shape
     h_crop = h_binned * binning_factor
     w_crop = w_binned * binning_factor
-    
-    # More efficient binning using reshape and mean
-    binned = stack[:, :, :h_crop, :w_crop].reshape(
-        z, c, h_binned, binning_factor, w_binned, binning_factor
-    ).mean(axis=(3, 5))
-    
+
+    binned = (
+        stack[:, :, :h_crop, :w_crop]
+        .reshape(z, c, h_binned, binning_factor, w_binned, binning_factor)
+        .mean(axis=(3, 5))
+    )
+
     return binned[:, 0], binned[:, 1]
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main():
+    # ------------------------------------------------------------------
+    # Parse arguments
+    # ------------------------------------------------------------------
+    if len(sys.argv) < 3:
+        print("Usage: python quantify_voxels.py <input_dir> <reg_dir> [require_metadata] [binning_factor]")
+        sys.exit(1)
 
     input_dir = sys.argv[1]
     reg_dir = sys.argv[2]
-    binning_factor = int(sys.argv[3]) if len(sys.argv) > 3 else 4
-    baseline_window = sys.argv[4] if len(sys.argv) > 4 and isinstance(sys.argv[4], tuple) else (0, 60)
-    fps = float(sys.argv[5]) if len(sys.argv) > 5 else 1/0.533
-    
+    require_metadata = bool(int(sys.argv[3])) if len(sys.argv) > 3 else True
+    binning_factor = int(sys.argv[4]) if len(sys.argv) > 4 else 1
+
     registered_dir = os.path.join(input_dir, reg_dir)
 
-    tif_paths = glob.glob(os.path.join(registered_dir, '*.tif'))
-    # sort 
-    tif_paths = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
-    
-    # get frame index from filename (assuming format like 'path/to/file/0001.tif')
-    tif_fns = sorted(tif_paths, key=lambda x: int(os.path.basename(x).split('.')[0]))
-    frame_vec = [int(os.path.basename(fn).split('.')[0]) for fn in tif_fns]
-    # make a time vector
-    time_vec = np.array(frame_vec) / fps
-    
-    # for each tif, we have a 3d stack of 2 channels. We want to quantify the intensity of channel 0 in each voxel after performing binning, normalized by the mean intensity of channel 1 in the same voxel
-    # load each tif, and perform binning, create a (time, z, height, width) array
-    
-    # Load first stack to get dimensions
+    # ------------------------------------------------------------------
+    # Discover registered TIFs (sorted by frame number)
+    # ------------------------------------------------------------------
+    tif_paths = sorted(
+        glob.glob(os.path.join(registered_dir, '*.tif')),
+        key=lambda x: int(os.path.basename(x).split('.')[0]),
+    )
+    if not tif_paths:
+        raise FileNotFoundError(f"No .tif files found in {registered_dir}")
+
+    # ------------------------------------------------------------------
+    # Load metadata
+    # ------------------------------------------------------------------
+    metadata_path = os.path.join(input_dir, 'metadata.json')
+
+    if os.path.exists(metadata_path):
+        with open(metadata_path, 'r') as fj:
+            meta = json.load(fj)
+
+        bad_frames = np.array(meta['bad_frames'], dtype=int)
+        frame_index = np.array(meta['frame_index'], dtype=int)
+        fps = float(meta['fps'])
+        nframes = int(meta['nframes'])
+        encounter_frame = meta.get('encounter_frame')  # int or None
+
+        bsf = meta.get('baseline_start_frame')
+        bef = meta.get('baseline_end_frame')
+        has_baseline = (bsf is not None) and (bef is not None)
+        baseline_window = (int(bsf), int(bef)) if has_baseline else None
+
+        time_vec = frame_index / fps
+        print(f"Loaded metadata from {metadata_path}")
+    else:
+        if require_metadata:
+            print(f"metadata.json not found in {input_dir} and require_metadata is True")
+            return
+        print(f"WARNING: metadata.json not found in {input_dir}")
+        print("  Using defaults — create metadata.json for accurate processing.")
+        fps = 1 / 0.533
+        baseline_window = (0, 60)
+        has_baseline = True
+        frame_index = np.array(
+            [int(os.path.basename(p).split('.')[0]) for p in tif_paths],
+            dtype=int,
+        )
+        time_vec = frame_index / fps
+        bad_frames = np.array([], dtype=int)
+        encounter_frame = None
+        nframes = len(tif_paths)
+
+    print(f"  fps={fps:.4f}, nframes={nframes}, binning_factor={binning_factor}")
+    print(f"  baseline_window={baseline_window}, encounter_frame={encounter_frame}")
+    print(f"  bad_frames: {len(bad_frames)} frames")
+
+    # ------------------------------------------------------------------
+    # Determine stack dimensions from first TIF
+    # ------------------------------------------------------------------
     first_stack = tifffile.imread(tif_paths[0])
-    # Assuming first_stack is (Z*C, H, W), need to separate channels
     if first_stack.ndim == 3:
-        # Stack is (Z*C, H, W), need to separate channels
         z_slices = first_stack.shape[0] // 2
         first_stack = first_stack.reshape(z_slices, 2, first_stack.shape[1], first_stack.shape[2])
-    
-    # Calculate binned dimensions
+
     z_slices, _, h, w = first_stack.shape
     h_binned = h // binning_factor
     w_binned = w // binning_factor
-    
-    # Initialize output array for GFP only: (T, Z, H_binned, W_binned)
-    # Use float32 to reduce memory usage
-    normalized_gfp = np.zeros((len(tif_paths), z_slices, h_binned, w_binned), dtype=np.float32)
-    # For RFP, only store the running sum to compute mean (saves ~17 GiB)
-    rfp_sum = np.zeros((z_slices, h_binned, w_binned), dtype=np.float64)  # Use float64 for accumulation precision
-    
-    # Process files sequentially (was doing this in parallel, but ran into memory issues)
-    print(f"Processing {len(tif_paths)} files")
-    
-    for i, tif_path in enumerate(tqdm(tif_paths, desc="Processing stacks")):
-        args = (tif_path, z_slices, h_binned, w_binned, binning_factor)
-        gfp, rfp = process_single_tif(args)
-        normalized_gfp[i] = gfp
-        rfp_sum += rfp  # Accumulate RFP for mean calculation
-    
-    # Compute RFP mean from accumulated sum
-    rfp_mean = (rfp_sum / len(tif_paths)).astype(np.float32)
-    
-    # Create mask for voxels that are 0 in GFP channel (should remain 0 throughout)
-    zero_mask = normalized_gfp == 0
+    del first_stack
 
-    # Ratiometric normalization: divide channel 0 by channel 1's mean across time
-    normalized_data = np.divide(normalized_gfp, rfp_mean, out=np.zeros_like(normalized_gfp), where=rfp_mean!=0)
-    # # baseline normalize by each voxel's mean over first 60 time points to get F/F_baseline
-    baseline = normalized_data[baseline_window[0]:baseline_window[1]].mean(axis=0)
-    normalized_data = np.divide(normalized_data, baseline, out=np.zeros_like(normalized_data), where=baseline!=0)
-    # divide each voxel by its 10th percentile across time
-    # F10 = np.percentile(normalized_data, 10, axis=0)
-    # normalized_data = normalized_data / (F10 + 1e-6)
-    
-    # Ensure voxels that were originally 0 remain 0
-    normalized_data[zero_mask] = 0
+    # ------------------------------------------------------------------
+    # Process all TIFs → GFP array + RFP running sum
+    # ------------------------------------------------------------------
+    T = len(tif_paths)
+    gfp_all = np.zeros((T, z_slices, h_binned, w_binned), dtype=np.float32)
+    rfp_sum = np.zeros((z_slices, h_binned, w_binned), dtype=np.float64)
 
-    r_rbaseline = normalized_data.copy()
-    
-    # Now normalized_data is (T, Z, H, W) array ready for further processing
-    print(f"Processed data shape: {normalized_data.shape}")
-    print(f"Binning factor: {binning_factor}")
-    
-    # # Save the normalized data, rfp_mean, gfp_mean, baseline in a npy file
-    # print('Saving r/r0 to npy file...')
-    # np.save(os.path.join(input_dir, 'r_r0.npy'), r_rbaseline)
-    # np.save(os.path.join(input_dir, 'rfp_mean.npy'), rfp_mean)
-    # np.save(os.path.join(input_dir, 'gfp_mean.npy'), normalized_gfp.mean(axis=0))
-    # np.save(os.path.join(input_dir, 'baseline.npy'), baseline)
-    # print(f"Saved r/r0 to {os.path.join(input_dir, 'r_r0.npy')}")
+    print(f"Processing {T} registered stacks …")
+    for i, tif_path in enumerate(tqdm(tif_paths, desc="Loading stacks")):
+        gfp, rfp = _process_single_tif(
+            tif_path, z_slices, h_binned, w_binned, binning_factor,
+        )
+        gfp_all[i] = gfp
+        rfp_sum += rfp
 
-    # load mask with metadata (it was saved to tif as tifffile.imwrite(roi_pth, roi.astype(np.uint8), imagej=True, metadata={'Labels': roi_labels}))
-    roi = tifffile.imread(os.path.join(input_dir, 'roi.tif'))
-    with tifffile.TiffFile(os.path.join(input_dir, 'roi.tif')) as tif:
-        labels = tif.imagej_metadata['Labels']
+    rfp_mean = (rfp_sum / T).astype(np.float32)
+    gfp_mean = gfp_all.mean(axis=0)
+    del rfp_sum
 
-    # load fixed mask
-    fixed_fn = glob.glob(os.path.join(input_dir, 'fixed_mask_[0-9][0-9][0-9][0-9]*.tif'))[0]
-    fixed_mask = tifffile.imread(fixed_fn)
+    # ------------------------------------------------------------------
+    # Ratiometric normalization: R = GFP / <RFP>_t
+    # ------------------------------------------------------------------
+    # Mask voxels that are identically 0 in GFP — these should stay 0.
+    zero_mask = gfp_all == 0
 
-    # save all data in a .h5 file
-    print('Saving r/r0, roi, and fixed mask to h5 file...')
-    with h5py.File(os.path.join(input_dir, f'{os.path.basename(input_dir)}_processed_voxels.h5'), 'w') as f:
-        f.create_dataset('r_r0', data=r_rbaseline, compression='gzip')
+    ratio = np.divide(
+        gfp_all, rfp_mean,
+        out=np.zeros_like(gfp_all),
+        where=rfp_mean != 0,
+    )
+    ratio[zero_mask] = 0.0
+    del gfp_all, zero_mask
+
+    # ------------------------------------------------------------------
+    # NaN-fill bad frames (preserves T dimension & frame alignment)
+    # ------------------------------------------------------------------
+    if len(bad_frames) > 0:
+        valid_bad = bad_frames[bad_frames < T]
+        if len(valid_bad) > 0:
+            ratio[valid_bad] = np.nan
+            print(f"NaN-filled {len(valid_bad)} bad frames in ratio array")
+
+    # ------------------------------------------------------------------
+    # Compute normalization references (saved but NOT applied)
+    # ------------------------------------------------------------------
+    # 1. Baseline mean of R over baseline_window (only if baseline is set)
+    if has_baseline:
+        baseline = ratio[baseline_window[0]:baseline_window[1]]
+        baseline = np.nanmean(baseline, axis=0).astype(np.float32)
+        print(f"Computed baseline mean over frames {baseline_window}")
+    else:
+        baseline = None
+        print("No baseline_window set — skipping baseline computation")
+
+    # 2. F20: 20th percentile of R across time (ignoring NaN)
+    f20 = np.nanpercentile(ratio, 20, axis=0).astype(np.float32)
+    print("Computed F20 (20th percentile across time)")
+
+    print(f"Ratio array shape: {ratio.shape}")
+
+    # ------------------------------------------------------------------
+    # Load ROI and fixed mask
+    # ------------------------------------------------------------------
+    # roi_path = os.path.join(input_dir, 'roi.tif')
+    # roi = tifffile.imread(roi_path) # shape (Z,H,W), uint8 labels
+    # with tifffile.TiffFile(roi_path) as tif:
+    #     roi_labels = tif.imagej_metadata['Labels'] # should include ['procorpus', 'metacorpus', 'isthmus', 'terminal_bulb', 'nerve_ring', 'ventral_nerve_cord'] and sometimes also include ['dorsal_nerve_cord']
+
+    fixed_fns = glob.glob(os.path.join(input_dir, 'fixed_mask_[0-9][0-9][0-9][0-9]*.tif'))
+    if not fixed_fns:
+        raise FileNotFoundError(f"No fixed_mask_*.tif found in {input_dir}")
+    fixed_mask = tifffile.imread(fixed_fns[0]) # shape (H,W)
+
+    # ------------------------------------------------------------------
+    # Save consolidated .h5
+    # ------------------------------------------------------------------
+    out_name = f"{os.path.basename(input_dir)}_processed_data.h5"
+    out_path = os.path.join(input_dir, out_name)
+    print(f"Saving to {out_path} …")
+
+    with h5py.File(out_path, 'w') as f:
+        # --- Data arrays ---
+        f.create_dataset('ratio', data=ratio, compression='gzip')
         f.create_dataset('rfp_mean', data=rfp_mean, compression='gzip')
-        f.create_dataset('gfp_mean', data=normalized_gfp.mean(axis=0), compression='gzip')
-        f.create_dataset('baseline', data=baseline, compression='gzip')
-        f.create_dataset('time_vec', data=time_vec, compression='gzip')
-        f.create_dataset('frame_vec', data=frame_vec, compression='gzip')
-        f.create_dataset('binning_factor', data=binning_factor)
-        f.create_dataset('fps', data=fps)
-        f.create_dataset('baseline_window', data=baseline_window)
-        f.create_dataset('roi', data=roi, compression='gzip')
-        f.create_dataset('roi_labels', data=labels)
+        f.create_dataset('gfp_mean', data=gfp_mean, compression='gzip')
+        f.create_dataset('f20', data=f20, compression='gzip')
+        if baseline is not None:
+            f.create_dataset('baseline', data=baseline, compression='gzip')
+
+        # --- Masks ---
+        # f.create_dataset('roi', data=roi, compression='gzip') # will append rois later
+        # f.create_dataset('roi_labels', data=roi_labels)
         f.create_dataset('fixed_mask', data=fixed_mask, compression='gzip')
-    print("Done")
+
+        # --- Timing ---
+        f.create_dataset('time_vec', data=time_vec, compression='gzip')
+        f.create_dataset('frame_index', data=frame_index, compression='gzip')
+        f.create_dataset('fps', data=fps)
+
+        # --- Processing parameters ---
+        f.create_dataset('binning_factor', data=binning_factor)
+        f.create_dataset('nframes', data=nframes)
+
+        # --- Metadata (use -1 sentinel for unset values) ---
+        bw = np.array(baseline_window, dtype=int) if has_baseline else np.array([-1, -1], dtype=int)
+        f.create_dataset('baseline_window', data=bw)
+        f.create_dataset('encounter_frame', data=encounter_frame if encounter_frame is not None else -1)
+        f.create_dataset('bad_frames', data=bad_frames, compression='gzip')
+
+    print(f"Done — saved {out_path}")
+
+
+if __name__ == '__main__':
+    main()

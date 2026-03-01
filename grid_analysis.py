@@ -65,6 +65,27 @@ def create_grid(height, width, grid_spacing_x, grid_spacing_y):
     
     return grid_info, n_grids_y, n_grids_x
 
+def calculate_grid_intensity_single_frame(frame, mask, grid_info):
+    """
+    Calculate mean intensity in each grid square for a single frame.
+    
+    Args:
+        frame: (H, W) array for a single time point and z-slice
+        mask: (H, W) array
+        grid_info: list of tuples (grid_id, y_start, y_end, x_start, x_end)
+    Returns:
+        grid_intensity: (n_grids,) array of mean intensity for each grid
+    """    
+    grid_intensity = np.zeros(len(grid_info))
+    
+    for grid_id, y_start, y_end, x_start, x_end in grid_info:
+        grid_mask = mask[y_start:y_end, x_start:x_end]
+        grid_data = frame[y_start:y_end, x_start:x_end]
+        
+        # Calculate mean intensity for this grid (no masking applied to data)
+        grid_intensity[grid_id] = grid_data.mean()
+    
+    return grid_intensity
 
 def calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spacing_y, bin_factor=1):
     """
@@ -88,6 +109,9 @@ def calculate_grid_intensities(normalized_data, mask, grid_spacing_x, grid_spaci
         grid_mask_coverage: (Z, n_grids_y, n_grids_x) array - mask coverage for each grid (0-1)
         grid_in_mask: (n_grids_y, n_grids_x) boolean array - True if grid is within mask
     """
+    
+    
+    
     n_time, n_z, height, width = normalized_data.shape
     
     # Bin mask if needed
