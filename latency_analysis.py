@@ -1313,12 +1313,58 @@ def compute_roi_latency_stats(
     return result
 
 
+def plot_roi_latency_cdf(
+    roi_latency_dict: Dict[str, np.ndarray],
+    fps: float,
+    encounter_frame: Optional[int] = None,
+    figsize: Tuple[float, float] = (8, 5),
+    roi_colors: Optional[Dict[str, str]] = None,
+) -> plt.Figure:
+    """Overlaid CDF curves of response latency, one per ROI.
+
+    Parameters
+    ----------
+    roi_latency_dict : dict mapping ROI label → (N,) latency array (frames).
+    fps : frames per second.
+    encounter_frame : absolute encounter frame (optional vertical line).
+    roi_colors : optional dict mapping ROI label → hex colour string.
+    """
+    fig, ax = pretty_plot(figsize=figsize)
+
+    for label, lat in roi_latency_dict.items():
+        valid = lat[~np.isnan(lat)]
+        if len(valid) == 0:
+            continue
+        lat_sec = np.sort(valid) / fps
+        cdf = np.arange(1, len(lat_sec) + 1) / len(lat_sec)
+        color = roi_colors.get(label) if roi_colors else None
+        ax.step(lat_sec, cdf, where='post', lw=2,
+                color=color, label=f'{label} (n={len(lat_sec)})')
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Fraction of responsive voxels activated')
+    ax.set_ylim(0, 1.05)
+    ax.legend(fontsize=10, loc='lower right')
+
+    if encounter_frame is not None:
+        ax.axvline(encounter_frame / fps, color='k', ls='--', label='encounter')
+
+    fig.tight_layout()
+    return fig
+
+
 def plot_roi_latency_comparison(
     roi_latency_dict: Dict[str, np.ndarray],
     fps: float,
     encounter_frame: Optional[int] = None,
+    roi_colors: Optional[Dict[str, str]] = None,
 ) -> plt.Figure:
-    """Box/violin plot comparing latency distributions across ROIs."""
+    """Box/violin plot comparing latency distributions across ROIs.
+
+    Parameters
+    ----------
+    roi_colors : optional dict mapping ROI label → hex colour string.
+    """
     labels = list(roi_latency_dict.keys())
     data_sec = [v / fps for v in roi_latency_dict.values()]
 
@@ -1326,6 +1372,16 @@ def plot_roi_latency_comparison(
     parts = ax.violinplot(
         data_sec, showmedians=True, showextrema=False,
     )
+
+    # Colour each violin body by ROI
+    if roi_colors is not None:
+        for body, label in zip(parts['bodies'], labels):
+            color = roi_colors.get(label)
+            if color is not None:
+                body.set_facecolor(color)
+                body.set_edgecolor(color)
+                body.set_alpha(0.7)
+
     ax.set_xticks(range(1, len(labels) + 1))
     ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=12)
     ax.set_ylabel('Response latency (s)')
