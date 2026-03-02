@@ -121,6 +121,43 @@ class CenteredPowerNorm(mcolors.Normalize):
         return out
 
 
+def _resample_diverging_cmap(
+    cmap_name: str,
+    vcenter_frac: float,
+    N: int = 256,
+) -> mcolors.ListedColormap:
+    """Resample a diverging colourmap so its centre colour sits at *vcenter_frac*.
+
+    The lower half of the source colourmap (0 → 0.5, e.g. blue→white in
+    ``RdBu_r``) is compressed / stretched into ``[0, vcenter_frac]``, and the
+    upper half (0.5 → 1.0, e.g. white→red) into ``[vcenter_frac, 1.0]``.
+
+    This lets us pair the resampled colourmap with a **linear** (or power-law)
+    ``Normalize`` and still have the neutral colour appear at the correct data
+    value, while the colourbar width on each side is proportional to the data
+    range.
+
+    Parameters
+    ----------
+    cmap_name : str
+        Name of a matplotlib diverging colourmap (e.g. ``'RdBu_r'``).
+    vcenter_frac : float
+        Fractional position (0–1) in the *output* colourmap where the centre
+        colour of the *input* colourmap should appear.
+    N : int
+        Number of discrete colour samples.
+    """
+    vcenter_frac = float(np.clip(vcenter_frac, 0.005, 0.995))
+    base_cmap = plt.get_cmap(cmap_name)
+    n_lower = max(int(round(N * vcenter_frac)), 1)
+    n_upper = N - n_lower
+    lower = base_cmap(np.linspace(0, 0.5, n_lower))
+    upper = base_cmap(np.linspace(0.5, 1.0, n_upper))
+    newcmap = mcolors.ListedColormap(np.vstack([lower, upper]))
+    newcmap.set_bad(alpha=0)
+    return newcmap
+
+
 # ============================================================================
 # DATA LOADING
 # ============================================================================
@@ -721,8 +758,10 @@ def plot_voxel_heatmap(
     fps: float,
     time_window: Optional[Tuple[int, int]] = None,
     max_voxels: int = 50000,
-    vmin_pct: float = 1.0,
+    vmin_pct: float = 0.0,
     vmax_pct: float = 99.0,
+    cmap: str = 'viridis',
+    figsize: Tuple[float, float] = (12, 6),
 ) -> plt.Figure:
     """Heatmap of voxel traces, sorted by variance."""
     if time_window is not None:
@@ -735,15 +774,15 @@ def plot_voxel_heatmap(
     var = np.nanvar(sub, axis=0)
     order = np.argsort(var)[::-1]
     n_show = min(max_voxels, sub.shape[1])
-    sorted_data = sub[:, order[:n_show]]
+    sorted_data = sub[:, order[:n_show]]    
 
     vmin = np.nanpercentile(sorted_data, vmin_pct)
     vmax = np.nanpercentile(sorted_data, vmax_pct)
     time = (np.arange(sub.shape[0]) + t_off) / fps
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=figsize)
     im = ax.imshow(
-        sorted_data.T, aspect='auto', cmap='viridis',
+        sorted_data.T, aspect='auto', cmap=cmap,
         extent=[time[0], time[-1], 0, n_show],
         vmin=vmin, vmax=vmax,
     )
@@ -1019,32 +1058,133 @@ def plot_latency_min_projection(
     encounter_frame: Optional[int] = None,
     gamma: float = 1.0,
     cmap: str = 'RdBu_r',
-    max_latency_offset: float = 20.0,
+    max_latency_offset: float = 40.0,
     figsize: Tuple[float, float] = (8, 6),
     num_cbar_ticks: int = 6,
     norm_cmap: Optional[mcolors.Normalize] = None,
     mask_bg: Optional[str] = None,
+    encounter_aligned: bool = True,
 ) -> plt.Figure:
     """Min-latency projection across all z-slices.
 
     For each (h, w) pixel, the shortest response latency across z-planes
-    is shown.  Uses the same encounter-centred norm logic as
-    ``plot_latency_spatial_map``.
+    is shown.  When *encounter_frame* is provided and no explicit *norm_cmap*
+    is given, the diverging colourmap is **resampled** so that its centre
+    colour (e.g. white in ``RdBu_r``) sits at the proportional position of
+    the encounter time within ``[vmin, vmax]``.  A standard ``PowerNorm``
+    handles the data→[0,1] mapping, so the colourbar width on each side
+    faithfully represents the data range (skewed distributions produce
+    asymmetric colour usage).
 
     Parameters
     ----------
-    norm_cmap : optional Normalize override.
-    mask_bg : optional background colour for masked NaN pixels.
+    latency : (V,) ndarray
+        Per-voxel latency in absolute frame indices (NaN for non-responsive).
+    fps : float
+        Frames per second.
+    selected_indices : (V,) ndarray
+        Column indices from ``select_top_n_voxels``.
+    mask_flat : (Z*H*W,) bool ndarray
+        Flat boolean mask from ``flatten_and_mask``.
+    mask_3d : (Z, H, W) bool ndarray
+        3-D spatial mask.
+    spatial_shape : (Z, H, W)
+        Shape of the preprocessed volume.
+    encounter_frame : int or None
+        Absolute frame index of food encounter.  Draws the encounter marker
+        on the colourbar and (when *encounter_aligned* is True) shifts
+        latencies so encounter = 0 s.
+    gamma : float
+        Exponent for ``PowerNorm``.  ``gamma < 1`` expands small values;
+        ``gamma > 1`` compresses them.  Only used when *norm_cmap* is None.
+    cmap : str
+        Matplotlib colourmap name.  Diverging maps (e.g. ``'RdBu_r'``,
+        ``'coolwarm'``, ``'seismic'``) work best when an encounter centre
+        is desired.
+    max_latency_offset : float
+        Latencies more than this many seconds after the encounter are set to
+        NaN (removes extremely late outliers from the colour scale).
+    figsize : (float, float)
+        Figure dimensions in inches.
+    num_cbar_ticks : int
+        Number of evenly-spaced tick marks on the colourbar.
+    norm_cmap : matplotlib.colors.Normalize or None
+        **Override** for the data-to-colourmap normalisation.  When supplied,
+        the automatic ``PowerNorm`` + resampled-cmap construction is skipped
+        entirely: the provided norm is used as-is with the raw *cmap* string.
+
+        Common variants and example usage:
+
+        1. **None (default)** — automatic.  A ``PowerNorm(gamma)`` is built
+           from the data range, and the colourmap is resampled so encounter
+           sits at the correct proportional position.
+
+               fig = plot_latency_min_projection(latency, fps, ...)
+               # gamma=1 → linear mapping, resampled cmap
+
+        2. **PowerNorm** — manual linear/power stretch without encounter
+           centring (colourmap is used unmodified).
+
+               from matplotlib.colors import PowerNorm
+               fig = plot_latency_min_projection(
+                   latency, fps, ...,
+                   norm_cmap=PowerNorm(gamma=0.5, vmin=-5, vmax=40),
+               )
+
+        3. **TwoSlopeNorm** — piecewise-linear with an explicit centre.
+           The colourbar may look asymmetric, but the data→colour mapping
+           is strictly linear on each side.
+
+               from matplotlib.colors import TwoSlopeNorm
+               fig = plot_latency_min_projection(
+                   latency, fps, ...,
+                   norm_cmap=TwoSlopeNorm(vcenter=0, vmin=-5, vmax=40),
+               )
+
+        4. **CenteredPowerNorm** (this module) — centre sits at 0.5 in the
+           colourmap with a power stretch on each side.  The colourbar
+           always has equal visual width for below/above centre, regardless
+           of data skew.
+
+               norm = CenteredPowerNorm(gamma=0.5, vcenter=0,
+                                        vmin=-5, vmax=40)
+               fig = plot_latency_min_projection(
+                   latency, fps, ..., norm_cmap=norm,
+               )
+
+        5. **Normalize (linear)** — simple linear clamp.
+
+               from matplotlib.colors import Normalize
+               fig = plot_latency_min_projection(
+                   latency, fps, ...,
+                   norm_cmap=Normalize(vmin=-2, vmax=20),
+               )
+
+    mask_bg : str or None
+        Optional colour string (e.g. ``'black'``, ``'#222222'``).  When set,
+        pixels inside the spatial mask that have no data (NaN) are filled
+        with this colour instead of transparent background.
+    encounter_aligned : bool
+        If True (default) and *encounter_frame* is provided, latencies are
+        expressed relative to the encounter time (i.e. encounter = 0 s).
+        If False, latencies remain in absolute seconds.
     """
     lat_sec = latency.copy() / fps
 
     if encounter_frame is not None:
         enc_sec = encounter_frame / fps
         lat_sec[lat_sec > enc_sec + max_latency_offset] = np.nan
-        encounter_time = enc_sec
+        if encounter_aligned:
+            lat_sec = lat_sec - enc_sec
+            encounter_time = 0.0
+            vcenter = 0.0
+        else:
+            encounter_time = enc_sec
+            vcenter = enc_sec
     else:
         enc_sec = None
         encounter_time = None
+        vcenter = None
 
     # --- reconstruct 3-D latency volume and project ---
     coords = preprocessed_idx_to_spatial(
@@ -1067,16 +1207,31 @@ def plot_latency_min_projection(
     vmin = float(np.nanmin(valid))
     vmax = float(np.nanmax(valid))
 
-    # --- build norm ---
+    # --- build norm and colourmap ---
+    #
+    # Strategy: resample the diverging colourmap so that its centre colour
+    # (e.g. white in RdBu_r) sits at the *proportional* position of
+    # ``vcenter`` within [vmin, vmax].  A standard PowerNorm then maps the
+    # data linearly (gamma=1) or with a power stretch, and the colourbar
+    # width on each side faithfully represents the data range.  For skewed
+    # distributions (e.g. [-1, 40] with encounter at 0) the bar is mostly
+    # red with only a thin blue sliver.
     if norm_cmap is None:
-        if enc_sec is not None:
-            norm = CenteredPowerNorm(
-                gamma=gamma, vcenter=enc_sec, vmin=vmin, vmax=vmax,
+        norm = mcolors.PowerNorm(gamma=gamma, vmin=vmin, vmax=vmax)
+        if vcenter is not None and vmax != vmin:
+            # Fractional position of vcenter after the power transform
+            linear_frac = np.clip(
+                (vcenter - vmin) / (vmax - vmin), 0.005, 0.995,
             )
+            vcenter_frac = np.clip(linear_frac ** gamma, 0.005, 0.995)
+            cmap_obj = _resample_diverging_cmap(cmap, vcenter_frac)
         else:
-            norm = mcolors.PowerNorm(gamma=gamma, vmin=vmin, vmax=vmax)
+            cmap_obj = plt.get_cmap(cmap).copy()
+            cmap_obj.set_bad(alpha=0)
     else:
         norm = norm_cmap
+        cmap_obj = plt.get_cmap(cmap).copy()
+        cmap_obj.set_bad(alpha=0)
 
     # --- plot ---
     fig, ax = plt.subplots(figsize=figsize)
@@ -1088,9 +1243,6 @@ def plot_latency_min_projection(
         bg[mask_2d] = mcolors.to_rgba(mask_bg)
         ax.imshow(bg, interpolation='nearest')
 
-    cmap_obj = plt.get_cmap(cmap).copy()
-    cmap_obj.set_bad(alpha=0)
-
     im = ax.imshow(min_proj, cmap=cmap_obj, norm=norm)
     ax.contour(mask_2d.astype(float), colors='gray', linewidths=0.5,
                levels=[0.5])
@@ -1099,7 +1251,7 @@ def plot_latency_min_projection(
 
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal',
                         fraction=0.06, pad=0.08)
-    ticks = np.round(np.linspace(vmin, vmax, num_cbar_ticks), 2)
+    ticks = np.round(np.linspace(vmin, vmax, num_cbar_ticks), 0)
     cbar.set_ticks(ticks)
     cbar.set_label('Latency (s)')
     if encounter_time is not None:
@@ -1317,7 +1469,7 @@ def plot_roi_latency_cdf(
     roi_latency_dict: Dict[str, np.ndarray],
     fps: float,
     encounter_frame: Optional[int] = None,
-    figsize: Tuple[float, float] = (8, 5),
+    figsize: Tuple[float, float] = (6,4),
     roi_colors: Optional[Dict[str, str]] = None,
 ) -> plt.Figure:
     """Overlaid CDF curves of response latency, one per ROI.
@@ -1335,19 +1487,22 @@ def plot_roi_latency_cdf(
         valid = lat[~np.isnan(lat)]
         if len(valid) == 0:
             continue
-        lat_sec = np.sort(valid) / fps
+        if encounter_frame is not None:
+            lat_sec = np.sort(valid) / fps - (encounter_frame / fps)
+        else:
+            lat_sec = np.sort(valid) / fps
         cdf = np.arange(1, len(lat_sec) + 1) / len(lat_sec)
         color = roi_colors.get(label) if roi_colors else None
-        ax.step(lat_sec, cdf, where='post', lw=2,
+        ax.step(lat_sec, cdf*100, where='post', lw=2,
                 color=color, label=f'{label} (n={len(lat_sec)})')
 
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Fraction of responsive voxels activated')
-    ax.set_ylim(0, 1.05)
-    ax.legend(fontsize=10, loc='lower right')
+    ax.set_xlabel('Response latency from \nencounter (sec)')
+    ax.set_ylabel('Cumulative percent \nof voxels')
+    ax.set_ylim(0, 105)
+    # ax.legend(fontsize=10, loc='lower right')
 
     if encounter_frame is not None:
-        ax.axvline(encounter_frame / fps, color='k', ls='--', label='encounter')
+        ax.axvline(0, color='k', ls='--', label='encounter')
 
     fig.tight_layout()
     return fig
