@@ -4,12 +4,19 @@
 # The code is used under the MIT License.
 from __future__ import annotations
 
+import glob
+import os
+import re
 from typing import Literal, Tuple
 
 import numpy as np
+import scipy.ndimage as ndi
+import tifffile
 import torch
+from tqdm import tqdm
 
 import benchmark_utils as utils
+
 
 EPS = 1.0e-5
 
@@ -261,3 +268,172 @@ def calculate_ncc(moving: np.ndarray, fixed: np.ndarray) -> float:
     denominator = np.sqrt(np.sum(fixed_new**2) * np.sum(moving_new**2))
 
     return float(numerator / denominator)
+
+
+###############################################
+##### Registration ZNCC time-series utils #####
+###############################################
+
+def zncc_2d(a: np.ndarray, b: np.ndarray, eps: float = 1e-8) -> float:
+    """Zero-normalized cross-correlation between two 2-D arrays."""
+    a = a.astype(np.float64)
+    b = b.astype(np.float64)
+    a_centered = a - a.mean()
+    b_centered = b - b.mean()
+    num = np.sum(a_centered * b_centered)
+    den = np.sqrt(np.sum(a_centered ** 2) * np.sum(b_centered ** 2)) + eps
+    return float(num / den)
+
+
+def zncc_per_zslice(ref: np.ndarray, mov: np.ndarray) -> np.ndarray:
+    """
+    Per-z-slice ZNCC between *ref* and *mov*, both shaped (Z, H, W).
+
+    Returns an array of shape (Z,) with scalar ZNCC per slice.
+    """
+    if ref.shape != mov.shape:
+        raise ValueError(
+            f"ref and mov must have the same shape, got {ref.shape} vs {mov.shape}"
+        )
+    Z = ref.shape[0]
+    return np.array([zncc_2d(ref[z], mov[z]) for z in range(Z)])
+
+
+def parse_zoom_factor(reg_dir: str) -> int:
+    """
+    Extract the integer zoom factor from a directory name containing 'zoom<N>'.
+
+    Returns 1 if 'zoom' is not present.
+    """
+    m = re.search(r"zoom(\d+)", reg_dir)
+    if m:
+        return int(m.group(1))
+    return 1
+
+
+def load_registered_paths(reg_dir: str):
+    """
+    Return a sorted list of .tif paths inside *reg_dir*.
+    """
+    paths = glob.glob(os.path.join(reg_dir, "*.tif"))
+    paths = sorted(paths, key=lambda p: int(os.path.basename(p).split(".")[0]))
+    return paths
+
+
+def compute_zncc_timeseries(
+    fixed_img: np.ndarray,
+    reg_dir: str,
+    channel: int = 1,
+) -> np.ndarray:
+    """
+    Compute per-z-slice ZNCC between a fixed/reference image and every frame
+    in a registered time-series directory.
+
+    Parameters
+    ----------
+    fixed_img : np.ndarray
+        Reference volume of shape (Z_fixed, C, H, W).
+    reg_dir : str
+        Directory containing registered .tif files named 0000.tif, 0001.tif, ...
+        Each .tif has shape (Z_reg, C, H, W).
+        If the directory name contains 'zoom<N>', the fixed image is zoomed
+        along Z by that factor so its Z dimension matches the registered images.
+    channel : int
+        Channel index to correlate (default 1, i.e. the 2nd channel).
+
+    Returns
+    -------
+    zncc : np.ndarray
+        Array of shape (T, Z_reg) with the per-z-slice ZNCC at each time point.
+    """
+    reg_paths = load_registered_paths(reg_dir)
+    T = len(reg_paths)
+    if T == 0:
+        raise ValueError(f"No .tif files found in {reg_dir}")
+
+    # Determine zoom factor from directory name
+    zoom_factor = parse_zoom_factor(os.path.basename(reg_dir))
+    zoom_factor = 1
+
+    # Extract the channel from the fixed image and zoom if needed
+    ref = fixed_img[:, channel, :, :]  # (Z_fixed, H, W)
+    if zoom_factor > 1:
+        ref = ndi.zoom(ref, zoom=(zoom_factor, 1, 1), order=1)
+
+    # Read first registered frame to confirm Z matches
+    first_frame = tifffile.imread(reg_paths[0])
+    Z_reg = first_frame.shape[0]
+    if ref.shape[0] != Z_reg:
+        raise ValueError(
+            f"After zoom, reference Z={ref.shape[0]} does not match "
+            f"registered Z={Z_reg}. Check zoom factor."
+        )
+
+    zncc = np.zeros((T, Z_reg))
+    for i in tqdm(range(T), desc="ZNCC time-series"):
+        mov = tifffile.imread(reg_paths[i])[:, channel, :, :]  # (Z_reg, H, W)
+        zncc[i] = zncc_per_zslice(ref, mov)
+
+    return zncc
+
+
+def plot_zncc_timeseries(
+    zncc: np.ndarray,
+    *,
+    ax=None,
+    show_mean: bool = False,
+    alpha_slices: float = 0.5,
+    label: str = "mean ZNCC",
+    title: str = "ZNCC over time",
+    cmap: str = "viridis",
+):
+    """
+    Plot ZNCC vs frame index.
+
+    Parameters
+    ----------
+    zncc : np.ndarray
+        Shape (T, Z).  Per-z-slice ZNCC at each time point.
+    ax : matplotlib Axes, optional
+        If None, a new figure is created.
+    show_mean : bool
+        If True, the mean ZNCC line is drawn.
+    alpha_slices : float
+        Opacity for individual z-slice traces.
+    label : str
+        Legend label for the mean line.
+    title : str
+        Axes title.
+    cmap : str
+        Matplotlib colormap name used to color individual z-slice traces.
+
+    Returns
+    -------
+    fig, ax
+    """
+    import matplotlib.pyplot as plt
+
+    T, Z = zncc.shape
+    frames = np.arange(T)
+    mean_zncc = zncc.mean(axis=1)
+    sem_zncc = zncc.std(axis=1) / np.sqrt(Z)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 4), dpi=150)
+    else:
+        fig = ax.figure
+
+    colors = plt.get_cmap(cmap)(np.linspace(0, 1, Z))
+    for z in range(Z):
+        ax.plot(frames, zncc[:, z], alpha=alpha_slices, lw=0.5, color=colors[z])
+
+    # ax.fill_between(frames, mean_zncc - sem_zncc, mean_zncc + sem_zncc,
+    #                  alpha=0.3, color="k", label="±SEM")
+    if show_mean:
+        ax.plot(frames, mean_zncc, color="k", lw=1.5, label=label)
+
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("ZNCC")
+    ax.set_title(title)
+    # ax.legend()
+    return fig, ax
