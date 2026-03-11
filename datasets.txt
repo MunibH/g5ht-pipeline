@@ -33,8 +33,6 @@
 # UNPROCESSED
 
 
-/orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-fedpatch_worm002.nd2 (needs to be registered)
-
 /orcd/data/flavell/001/g5ht/DATA/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2
 /orcd/data/flavell/001/g5ht/DATA/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm002.nd2
 
