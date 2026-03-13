@@ -46,7 +46,7 @@
 /store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm001.nd2
 /store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm002.nd2
 
-/store1/shared/g5ht/data/20260217/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2
+/store1/shared/g5ht/data/20260127/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2
 
 /store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2
 /store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2
