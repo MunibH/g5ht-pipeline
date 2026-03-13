@@ -4,10 +4,11 @@
 Only performs up until drift estimation (step 5). If output of step 5 (z_selection.csv) already exists, it will skip that dataset unless --force is used.
 
 Usage:
-    uv run python /home/munib/code/g5ht-pipeline/batch_pipeline_stage1.py                    # process all unprocessed datasets
-    uv run python /home/munib/code/g5ht-pipeline/batch_pipeline_stage1.py --force            # re-process even if outputs exist
-    uv run python /home/munib/code/g5ht-pipeline/batch_pipeline_stage1.py --steps 1 2 3 4 5  # run only specific steps
-    uv run python /home/munib/code/g5ht-pipeline/batch_pipeline_stage1.py --dry-run          # list datasets without processing
+    uv run python batch_pipeline_stage1.py                    # process all unprocessed datasets
+    uv run python batch_pipeline_stage1.py --force            # re-process even if outputs exist
+    uv run python batch_pipeline_stage1.py --steps 1 2 3 4 5  # run only specific steps
+    uv run python batch_pipeline_stage1.py --dry-run          # list datasets without processing
+    uv run python batch_pipeline_stage1.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/log_$(date +'%Y%m%d_%H%M%S').log"  # save output log with timestamp
     
 Running with tmux:
 
@@ -16,7 +17,7 @@ You can "detach" from it, go home, and "re-attach" later to see the exact same s
 Start a session:
     tmux new -s pipeline
 Run your code:
-    uv run python /home/munib/code/g5ht-pipeline/batch_pipeline_stage1.py
+    uv run python batch_pipeline_stage1.py
 Detach: Press Ctrl+B, then let go and press D. 
 You can now safely close your terminal or turn off your computer.
 Re-attach later:
