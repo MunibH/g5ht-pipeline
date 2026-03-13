@@ -1,0 +1,36 @@
+# python 3.13
+
+# INSTALL
+# uv init --python 3.13
+# uv venv
+# uv pip install -r requirements.txt
+# uv run python -m ipykernel install --user --name g5ht-pipeline --display-name "py-g5ht-pipeline"
+# USAGE
+# uv run python my_script.py
+# uv add new-library-name
+
+
+# Core Stack
+numpy
+scipy
+pandas
+matplotlib
+
+# Imaging & Data
+scikit-image
+tifffile
+imageio
+imageio-ffmpeg
+nd2reader
+h5py
+hdf5plugin
+
+# Processing & ML
+joblib
+scikit-learn
+opencv-python
+itk-elastix
+
+# Utilities
+tqdm
+ipykernel
