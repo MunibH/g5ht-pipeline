@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 """Batch pipeline script that processes all UNPROCESSED datasets from datasets.txt.
 
-Only performs up until drift estimation (step 5). If output of step 5 (z_selection.csv) already exists, it will skip that dataset unless --force is used.
+Only performs up until spline (step 7). If output of step 7 (spline.json) already exists, it will skip that dataset unless --force is used.
+
+If running step 6 (segment) on a GPU, make sure to set CUDA_DEVICE to the correct GPU number (0-3) based on the flv-gpu reservation sheet.
 
 Usage:
-    uv run python batch_pipeline_stage1.py                    # process all unprocessed datasets
-    uv run python batch_pipeline_stage1.py --force            # re-process even if outputs exist
-    uv run python batch_pipeline_stage1.py --steps 1 2 3 4 5  # run only specific steps
-    uv run python batch_pipeline_stage1.py --dry-run          # list datasets without processing
-    uv run python batch_pipeline_stage1.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/log_$(date +'%Y%m%d_%H%M%S').log"  # save output log with timestamp
+    uv run python batch_pipeline_stage1.py                        # process all unprocessed datasets
+    uv run python batch_pipeline_stage1.py --force                # re-process even if outputs exist
+    uv run python batch_pipeline_stage1.py --steps 1 2 3 4 5 6 7  # run only specific steps
+    uv run python batch_pipeline_stage1.py --steps 7 --force      # force run a single step
+    uv run python batch_pipeline_stage1.py --dry-run              # list datasets without processing
+    uv run python batch_pipeline_stage1.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/stage1_log_$(date +'%Y%m%d_%H%M%S').log"  # save output log with timestamp
     
 Running with tmux:
 
@@ -26,6 +29,10 @@ Once done running:
     Press Ctrl+B, then let go and press D to detach again.
     To kill the session:
         tmux kill-session -t pipeline
+        
+After stage1 is done, run stage2 on the datasets that were just processed, which finds spline orientation:
+    uv run python batch_pipeline_stage2.py
+        
 """
 
 import argparse
@@ -38,22 +45,28 @@ from datetime import datetime
 import utils
 
 # pipeline modules
-import shear_correct
-import get_channel_alignment
-import median_channel_alignment
-import apply_channel_alignment
-import bleach_correct
-import mip
-import drift_estimation
+import shear_correct             # 1
+import get_channel_alignment     # 2a
+import median_channel_alignment  # 2b
+import apply_channel_alignment   # 2c
+import bleach_correct            # 3
+import mip                       # 4
+import drift_estimation          # 5
+import segment_torch             # 6
+import spline                    # 7
 
 NOISE_PTH = '/home/munib/code/g5ht-pipeline/noise/noise_111125.tif'
 DATASETS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datasets.txt')
 
+# this should be "cuda:CUDA_DEVICE", nvidia-smi provides differnet gpu numbers
+# see flv-gpu reservation sheet; on flv-c2, 
+CUDA_DEVICE = 2 # one of 0, 1, 2, 3 
+
 
 def is_already_processed(nd2_path):
-    """Check if a dataset has already been fully processed (drift estimation output exists)."""
+    """Check if a dataset has already been fully processed (spline output exists)."""
     pth = os.path.splitext(nd2_path)[0]
-    return os.path.exists(os.path.join(pth, 'z_selection.csv'))
+    return os.path.exists(os.path.join(pth, 'spline.json'))
 
 
 def process_dataset(nd2_path, steps, force=False):
@@ -61,7 +74,7 @@ def process_dataset(nd2_path, steps, force=False):
 
     Args:
         nd2_path: Path to the .nd2 file.
-        steps: Set of step numbers to run (1-5).
+        steps: Set of step numbers to run (1-7).
         force: If True, run even if outputs already exist.
     """
     print(f"\n{'='*80}")
@@ -183,6 +196,25 @@ def process_dataset(nd2_path, steps, force=False):
         tif_dir = 'bleach_corrected'
         sys.argv = ["", INPUT_ND2_PTH, tif_dir, STACK_LENGTH, num_frames]
         drift_estimation.main()
+        
+    # ---- Step 6: Segment ----
+    if 6 in steps:
+        print("\n--- Step 6: Segment ---")
+        importlib.reload(segment_torch)
+
+        mip_tif = 'mip_bleach_corrected'
+        MIP_PTH = os.path.join(os.path.splitext(INPUT_ND2_PTH)[0], f'{mip_tif}.tif')
+        sys.argv = ["", MIP_PTH, CUDA_DEVICE]
+        segment_torch.main()
+        
+    # ---- Step 7: Spline ----
+    if 7 in steps:
+        print("\n--- Step 7: Spline ---")
+        importlib.reload(spline)
+
+        label_tif = os.path.join(utils.get_output_dir(INPUT_ND2_PTH), 'label.tif')
+        sys.argv = ["", label_tif]
+        spline.main()
 
     print(f"\nCompleted: {nd2_path}")
     return True
@@ -192,8 +224,8 @@ def main():
     parser = argparse.ArgumentParser(description='Batch processing pipeline for g5ht datasets.')
     parser.add_argument('--force', action='store_true',
                         help='Re-process datasets even if outputs already exist.')
-    parser.add_argument('--steps', nargs='+', type=int, default=[1, 2, 3, 4, 5],
-                        help='Pipeline steps to run (1=shear, 2=channel_align, 3=bleach, 4=mip, 5=drift). Default: all.')
+    parser.add_argument('--steps', nargs='+', type=int, default=[1, 2, 3, 4, 5, 6, 7],
+                        help='Pipeline steps to run (1=shear, 2=channel_align, 3=bleach, 4=mip, 5=drift, 6=segment, 7=spline). Default: all.')
     parser.add_argument('--dry-run', action='store_true',
                         help='List datasets without processing.')
     parser.add_argument('--datasets', default=DATASETS_PATH,

@@ -34,3 +34,5 @@ itk-elastix
 # Utilities
 tqdm
 ipykernel
+ipympl
+ipywidgets
