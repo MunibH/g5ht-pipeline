@@ -30,3 +30,19 @@ Saving TIFF stack to: /store1/shared/g5ht/data/20260112/date-20260112_strain-ISg
 TIFF stack saved successfully.
 
 --- Step 9: Warp ---
+
+Completed: /store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2
+
+[2/12]
+
+================================================================================
+Processing: /store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001.nd2
+================================================================================
+
+
+--- Step 8: Orient ---
+Rendering and collecting frames...
+Saving TIFF stack to: /store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001/oriented_stack.tif
+TIFF stack saved successfully.
+
+--- Step 9: Warp ---
