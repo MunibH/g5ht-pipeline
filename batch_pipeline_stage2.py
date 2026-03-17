@@ -160,8 +160,9 @@ def process_dataset(nd2_path, steps, force=False):
         importlib.reload(reg)
         start_index = 0
         end_index = num_frames
+        print(f'num_frames: {num_frames}')
 
-        for i in tqdm(range(start_index, end_index)):
+        for i in tqdm(range(start_index, end_index), desc='Registering'):
             try:
                 sys.argv = ["", pth, i, str(ZOOM)]
                 reg.main()
@@ -169,8 +170,9 @@ def process_dataset(nd2_path, steps, force=False):
                 print(f"Error processing index {i}: {e}")   
 
             print(f"\nCompleted: {nd2_path}")
-            return True
 
+    print(f"\nFinished stage2: {nd2_path}")
+    return True
 
 def main():
     parser = argparse.ArgumentParser(description='Batch pipeline stage 2: orient + warp + register.')

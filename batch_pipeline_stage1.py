@@ -216,7 +216,7 @@ def process_dataset(nd2_path, steps, force=False):
         sys.argv = ["", label_tif]
         spline.main()
 
-    print(f"\nCompleted: {nd2_path}")
+    print(f"\nFinished stage1: {nd2_path}")
     return True
 
 
