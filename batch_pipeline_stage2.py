@@ -4,10 +4,19 @@
 Requires stage 1 to be completed (spline.json, dilated.tif, bleach_corrected/ must exist)
 and orient_nose.csv to be created (via the interactive nose annotator in the pipeline.ipynb).
 
+When batch processing using this script, the reference/fixed frame will be automatically selected based on the following criteria:
+- Straightness (how straight the worm is)
+- Sharpness (how sharp the image is)
+- RFP representativeness (how well the frame represents the temporal mean RFP)
+- Temporal bias (preference for frames near the middle of the recording)
+Might have to adjust the weights in pipeline.ipynb if the selected frame is not ideal, or just hand pick a frame and run reg.py through pipeline.ipynb
+
+
 Usage:
     uv run python batch_pipeline_stage2.py                        # process all unprocessed datasets
     uv run python batch_pipeline_stage2.py --force                # re-process even if outputs exist
-    uv run python batch_pipeline_stage2.py --steps 8 9            # run only specific steps
+    uv run python batch_pipeline_stage2.py --steps 8 9 10         # run only specific steps
+    uv run python batch_pipeline_stage2.py --steps 10 --force     # force run a single step
     uv run python batch_pipeline_stage2.py --dry-run              # list datasets without processing
     uv run python batch_pipeline_stage2.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/stage2_log_$(date +'%Y%m%d_%H%M%S').log"
     
@@ -40,8 +49,11 @@ from tqdm import tqdm
 
 import utils
 
-import orient   # 8
-import warp     # 9
+import orient       # 8
+import warp         # 9
+import select_fixed # 10a
+import reg          # 10b
+
 
 DATASETS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datasets.txt')
 
@@ -51,6 +63,17 @@ STAGE1_REQUIRED = {
     'dilated.tif': 'Step 7 (spline)',
     'bleach_corrected': 'Step 3 (bleach correction)',
 }
+
+# reference frame auto-selection weights (straightness, sharpness, zncc, z_coverage, temporal)
+DEFAULT_WEIGHTS = {
+    "straightness": 0.35,
+    "sharpness": 0.2,
+    "zncc": 0.35,
+    "z_coverage": 0.0,
+    "temporal": 0.1,
+}
+
+ZOOM = 1 # zoom factor for z-axis during registration
 
 
 def check_stage1(pth):
@@ -64,9 +87,9 @@ def check_stage1(pth):
 
 
 def is_already_processed(pth):
-    """Check if stage 2 is already complete (warped directory with files)."""
-    warped_dir = os.path.join(pth, 'warped')
-    return os.path.isdir(warped_dir) and len(os.listdir(warped_dir)) > 0
+    """Check if stage 2 is already complete (registered_elastix directory with files)."""
+    registered_dir = os.path.join(pth, 'registered_elastix')
+    return os.path.isdir(registered_dir) and len(os.listdir(registered_dir)) > 50 # arbitrarily checking if at least 50 volumes registered
 
 
 def process_dataset(nd2_path, steps, force=False):
@@ -124,17 +147,37 @@ def process_dataset(nd2_path, steps, force=False):
         for i in tqdm(range(num_frames), desc='Warping'):
             sys.argv = ["", pth, i]
             warp.main()
+    
+    # ---- Step 10: Register ----
+    if 10 in steps:
+        # 10a, auto-select reference frame
+        importlib.reload(select_fixed)
+        candidates_df = select_fixed.main(pth, weights=DEFAULT_WEIGHTS)
+        fixed_frame = int(candidates_df.iloc[0]['frame'])  # default: top-ranked candidate
+        select_fixed.set_fixed_frame(pth, fixed_frame)
+        
+        # 10b, register
+        importlib.reload(reg)
+        start_index = 0
+        end_index = num_frames
 
-    print(f"\nCompleted: {nd2_path}")
-    return True
+        for i in tqdm(range(start_index, end_index)):
+            try:
+                sys.argv = ["", pth, i, str(ZOOM)]
+                reg.main()
+            except Exception as e:
+                print(f"Error processing index {i}: {e}")   
+
+            print(f"\nCompleted: {nd2_path}")
+            return True
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Batch pipeline stage 2: orient + warp.')
+    parser = argparse.ArgumentParser(description='Batch pipeline stage 2: orient + warp + register.')
     parser.add_argument('--force', action='store_true',
                         help='Re-process datasets even if outputs already exist.')
-    parser.add_argument('--steps', nargs='+', type=int, default=[8, 9],
-                        help='Steps to run (8=orient, 9=warp). Default: both.')
+    parser.add_argument('--steps', nargs='+', type=int, default=[8, 9, 10],
+                        help='Steps to run (8=orient, 9=warp, 10=register). Default: all.')
     parser.add_argument('--dry-run', action='store_true',
                         help='List datasets and readiness without processing.')
     parser.add_argument('--datasets', default=DATASETS_PATH,

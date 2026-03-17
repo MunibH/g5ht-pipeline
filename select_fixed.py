@@ -272,7 +272,7 @@ def rank_frames(
 # Visualization
 # ---------------------------------------------------------------------------
 
-def make_montage(dataset_dir, candidates_df, n_zslices=6, output_name="fixed_frame_montage.png"):
+def make_montage(dataset_dir, candidates_df, n_zslices=9, output_name="fixed_frame_montage.png"):
     """Generate a z-slice montage for top candidate frames.
 
     Each row = one candidate frame, each column = evenly-spaced z-slice (RFP channel).
@@ -305,7 +305,6 @@ def make_montage(dataset_dir, candidates_df, n_zslices=6, output_name="fixed_fra
             if row_idx == 0:
                 ax.set_title(f"z={z_idx}", fontsize=8)
 
-    plt.suptitle("Fixed Frame Candidates — RFP z-slices", fontsize=11, y=1.01)
     plt.tight_layout()
     out_path = os.path.join(dataset_dir, output_name)
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
@@ -327,15 +326,17 @@ def copy_candidates(dataset_dir, candidates_df):
 
     for _, row in candidates_df.iterrows():
         frame = int(row["frame"])
-        fn = f"fixed_{frame:04d}.tif"
+        fn = f"{frame:04d}.tif"
+        newfn = f"fixed_{fn}"
+        newmaskfn = f"fixed_mask_{fn}"
         # copy warped volume
         src = os.path.join(warped_dir, fn)
         if os.path.exists(src):
-            shutil.copy2(src, os.path.join(out_dir, fn))
+            shutil.copy2(src, os.path.join(out_dir, newfn))
         # copy mask
         mask_src = os.path.join(masks_dir, fn)
         if os.path.exists(mask_src):
-            shutil.copy2(mask_src, os.path.join(out_dir, f"fixed_mask_{fn}"))
+            shutil.copy2(mask_src, os.path.join(out_dir, newmaskfn))
 
     print(f"Copied {len(candidates_df)} candidates to: {out_dir}")
     return out_dir
