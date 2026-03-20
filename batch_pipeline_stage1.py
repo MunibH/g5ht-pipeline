@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Batch pipeline script that processes all UNPROCESSED datasets from datasets.txt.
+"""Batch pipeline script that processes all STAGE1 datasets from datasets.txt.
 
 Only performs up until spline (step 7). If output of step 7 (spline.json) already exists, it will skip that dataset unless --force is used.
 
@@ -233,13 +233,13 @@ def main():
     args = parser.parse_args()
 
     steps = set(args.steps)
-    nd2_paths = utils.parse_datasets(args.datasets, section='UNPROCESSED')
+    nd2_paths = utils.parse_datasets(args.datasets, section='STAGE1')
 
     if not nd2_paths:
-        print("No unprocessed datasets found in datasets.txt")
+        print("No STAGE1 datasets found in datasets.txt")
         return
 
-    print(f"Found {len(nd2_paths)} unprocessed dataset(s):")
+    print(f"Found {len(nd2_paths)} STAGE1 dataset(s):")
     for p in nd2_paths:
         status = ""
         if not os.path.exists(p):

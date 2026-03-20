@@ -91,6 +91,8 @@ def parse_datasets(datasets_path, section='UNPROCESSED'):
             if in_section and line:
                 nd2_path = re.sub(r'\s*\(.*\)\s*$', '', line)
                 paths.append(nd2_path)
+    # only keep paths that contain 'nd2' and exist
+    paths = [p for p in paths if 'nd2' in p and os.path.exists(p)]
     return paths
 
 def get_output_dir(nd2_path):

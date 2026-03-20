@@ -1,8 +1,46 @@
 # Dataset paths - one ND2 file per line
 # Lines starting with # are comments
 # Empty lines are ignored
-# Only process files that are unprocessed
-# stage1 means those recordings have been processed up til the drift estimation step. needs to be segmented and registered
+
+# stage 1: recordings that need stage 1 processing
+# stage 2: recordings that need stage 2 processing, make sure to orient first in pipeline.ipynb
+
+# STAGE1_MANUAL
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm005.nd2 (working on it manually since failed in stage1)
+
+# STAGE1
+
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm012.nd2 (failed during chan align)
+
+/store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm001.nd2
+/store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2 (z=82)
+/store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm005.nd2
+/store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm007.nd2
+/store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm008.nd2
+/store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm009.nd2
+
+
+# STAGE2
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm006.nd2
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm009.nd2
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm010.nd2
+
+*********************************************************************************************************************************************
+# REGISTERED (need to make movie and post registration stuff [wholistic, metadata, roi, etc])
+
+/store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2 (stage1)
+/store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001.nd2 (stage1)
+/store1/shared/g5ht/data/20260120/date-20260120_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (stage1)
+/store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm001.nd2 (stage1)
+/store1/shared/g5ht/data/20260114/date-20260114_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (failed)
+/store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm002.nd2 (stage1)
+/store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2 (stage1)
+/store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2 (stage1)
+/store1/shared/g5ht/data/20260220/date-20260220_strain-ISg5HT-mod5_condition-starvedpatch_worm005.nd2 (stage1)
+
+/store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm002.nd2 (failed)
+/store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm005.nd2 (failed)
+/store1/shared/g5ht/data/20260127/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2 (think this is on engaging still)
 
 
 # PROCESSED
@@ -30,38 +68,3 @@
 /orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-starvedpatch_worm005.nd2 (on ssd, transferring started)
 
 /orcd/data/flavell/001/g5ht/DATA/20251223/date-20251223_strain-ISg5HT_condition-starvedpatch_worm004.nd2 (on ssd, transferring started)
-
-# STAGE 1 COMPLETED
-
-# UNPROCESSED
-
-/store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2 (stage1)
-/store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001.nd2 (stage1)
-/store1/shared/g5ht/data/20260120/date-20260120_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (stage1)
-/store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm001.nd2 (stage1)
-/store1/shared/g5ht/data/20260114/date-20260114_strain-ISg5HT_condition-starvedpatch_worm001.nd2 (failed)
-/store1/shared/g5ht/data/20260123/date-20260123_strain-ISg5HT_condition-fedpatch_worm002.nd2 (stage1)
-/store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-starvedpatch_worm004.nd2 (stage1)
-/store1/shared/g5ht/data/20260217/date-20260217_strain-ISg5HT-nsIS180_condition-fedpatch_worm006.nd2 (stage1)
-/store1/shared/g5ht/data/20260220/date-20260220_strain-ISg5HT-mod5_condition-starvedpatch_worm005.nd2 (stage1)
-
-/store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm002.nd2 (failed)
-/store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm005.nd2 (failed)
-/store1/shared/g5ht/data/20260127/date-20260127_strain-ISg5HT_condition-fedpatch_worm001.nd2 (think this is on engaging still)
-
-# currently processing stage 2 without registration, will need to force step 10 (tmux pipeline)
-# started a new stage2 with just step 10, but need to add benchmarking and then run that as well (tmux pipeline10)
-
-# BATCH SUMMARY 20260313
-
-================================================================================
-BATCH SUMMARY
-================================================================================
-  Succeeded: 8
-  Skipped:   1
-  Failed:    3
-
-Failed datasets:
-  /store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm002.nd2
-  /store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm005.nd2
-  /store1/shared/g5ht/data/20260114/date-20260114_strain-ISg5HT_condition-starvedpatch_worm001.nd2

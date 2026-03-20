@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Batch pipeline stage 2: orient + warp for all UNPROCESSED datasets.
+"""Batch pipeline stage 2: orient + warp for all STAGE2 datasets.
 
 Requires stage 1 to be completed (spline.json, dilated.tif, bleach_corrected/ must exist)
 and orient_nose.csv to be created (via the interactive nose annotator in the pipeline.ipynb).
@@ -187,13 +187,13 @@ def main():
     args = parser.parse_args()
 
     steps = set(args.steps)
-    nd2_paths = utils.parse_datasets(args.datasets, section='UNPROCESSED')
+    nd2_paths = utils.parse_datasets(args.datasets, section='STAGE2')
 
     if not nd2_paths:
-        print("No unprocessed datasets found in datasets.txt")
+        print("No STAGE2 datasets found in datasets.txt")
         return
 
-    print(f"Found {len(nd2_paths)} unprocessed dataset(s):\n")
+    print(f"Found {len(nd2_paths)} STAGE2 dataset(s):\n")
     for p in nd2_paths:
         pth = os.path.splitext(p)[0]
         status_parts = []
