@@ -75,7 +75,14 @@ def get_beads_alignment_file(input_nd2):
         return beads_file
     
 def parse_datasets(datasets_path, section='UNPROCESSED'):
-    """Return nd2 paths listed under the given section header."""
+    """Return nd2 paths listed under the given section header.
+    Args:
+        datasets_path (str): path to datasets.txt file
+        section (str): looks for datasets under '# <section>' in .txt file provided
+        
+    Returns:
+        int: Number of CPUs to utilize.
+    """
     paths = []
     in_section = False
     with open(datasets_path) as f:
