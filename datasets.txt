@@ -6,12 +6,8 @@
 # stage 2: recordings that need stage 2 processing, make sure to orient first in pipeline.ipynb
 
 # STAGE1_MANUAL
-/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm005.nd2 (working on it manually since failed in stage1)
 
 # STAGE1
-
-/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm012.nd2 (failed during chan align)
-
 /store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm001.nd2
 /store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2 (z=82)
 /store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm005.nd2
@@ -19,6 +15,9 @@
 /store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm008.nd2
 /store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm009.nd2
 
+# ORIENT
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm005.nd2 (working on it manually since failed in stage1)
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm012.nd2 (failed during chan align)
 
 # STAGE2
 /store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm006.nd2
@@ -26,7 +25,8 @@
 /store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm010.nd2
 
 *********************************************************************************************************************************************
-# REGISTERED (need to make movie and post registration stuff [wholistic, metadata, roi, etc])
+# REGISTERED - some failed 
+(need to make movie and post registration stuff [wholistic, metadata, roi, etc])
 
 /store1/shared/g5ht/data/20260112/date-20260112_strain-ISg5HT_condition-fedpatch_worm001.nd2 (stage1)
 /store1/shared/g5ht/data/20260113/date-20260113_strain-ISg5HT-ADF-TeTx_condition-starvedpatch_worm001.nd2 (stage1)
