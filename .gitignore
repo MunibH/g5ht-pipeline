@@ -32,3 +32,5 @@ SCRATCH/
 *.nii
 *.log.venv/
 *.log
+*.pt
+*.pth

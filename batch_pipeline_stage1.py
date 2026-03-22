@@ -11,7 +11,7 @@ Usage:
     uv run python batch_pipeline_stage1.py --steps 1 2 3 4 5 6 7  # run only specific steps
     uv run python batch_pipeline_stage1.py --steps 7 --force      # force run a single step
     uv run python batch_pipeline_stage1.py --dry-run              # list datasets without processing
-    uv run python batch_pipeline_stage1.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/stage1_log_$(date +'%Y%m%d_%H%M%S').log"  # save output log with timestamp
+    uv run python batch_pipeline_stage1.py | tee "/home/munib/code/g5ht-pipeline/processing_logs/stage1_$(date +'%Y%m%d_%H%M%S').log"  # save output log with timestamp
     
 Running with tmux:
 

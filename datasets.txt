@@ -5,24 +5,26 @@
 # stage 1: recordings that need stage 1 processing
 # stage 2: recordings that need stage 2 processing, make sure to orient first in pipeline.ipynb
 
-# STAGE1_MANUAL
+# MANUAL
+
 
 # STAGE1
 /store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm001.nd2
-/store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2 (z=82)
 /store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm005.nd2
 /store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm007.nd2
 /store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm008.nd2
 /store1/shared/g5ht/data/20260320/date-20260320_strain-exg5HT_condition-fedpatch_worm009.nd2
 
 # ORIENT
-/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm005.nd2 (working on it manually since failed in stage1)
-/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm012.nd2 (failed during chan align)
+/store1/shared/g5ht/data/20260320/date-20260320_strain-ISg5HT-mod-5_condition-fedpatch_worm003.nd2 (z=82)
 
 # STAGE2
 /store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm006.nd2
 /store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm009.nd2
 /store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm010.nd2
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-NSM-TeTx_condition-starvedpatch_worm005.nd2 
+/store1/shared/g5ht/data/20260319/date-20260319_strain-ISg5HT-nsIS180_condition-starvedpatch_worm012.nd2 
+
 
 *********************************************************************************************************************************************
 # REGISTERED - some failed 
