@@ -110,10 +110,10 @@ def map_timestamps(source_timing, reference_timing):
     # If the index is -1 or source_start > stop, it doesn't fit any interval
     mask = (idx >= 0) & (source_starts <= ref_stops[idx])
     
-    # Create result array (NaN for no match, 1-based indexing for matches)
+    # Create result array (NaN for no match, 0-based index of matching interval otherwise)
     result = np.full(source_starts.shape[0], np.nan)
-    result[mask] = idx[mask] + 1
-    
+    result[mask] = idx[mask]
+
     return result
 
 def generate_consecutive_counts(arr):
@@ -324,30 +324,40 @@ def sync_timing(di_confocal: np.ndarray,
     di_nir : 1-D array
         Digital trigger from NIR camera.
     ai_piezo : 1-D array
-        Metadata — see ``detect_nir_timing``.
+        Piezo analog signal.
 
     Returns
     -------
     confocal_to_nir : list[np.ndarray]
         For each confocal volume, the indices of NIR frames within it.
-    nir_to_confocal : 1-D int array
-        For each NIR frame, the **1-based** confocal volume index (0 = unassigned).
-    timing_stack : (n_volumes, 2) array
-        Confocal stack ``[start, stop]`` sample indices.
+    nir_to_confocal : 1-D float array
+        For each NIR frame, the **1-based** confocal volume index.
+        NaN for NIR frames with no corresponding confocal volume
+        (before/after confocal recording or during gaps).
+    timing_stack : (n_frames, 2) array
+        Confocal frame ``[start, stop]`` sample indices.
     timing_nir : (n_nir, 2) array
         NIR frame ``[on, off]`` sample indices.
     timing_piezo : (n_volumes, 2) array
         Piezo ``[start, stop]`` sample indices.
     nir_time_sec : 1-D array
         NIR frame timestamps in seconds.
+    piezo_to_confocal : 1-D float array
+        For each confocal DI event (row of timing_confocal), the 0-based
+        piezo volume it belongs to.  NaN if it falls outside all piezo
+        intervals.
     """
-    timing_stack = np.column_stack(detect_confocal_timing_di(di_confocal)).T
-    timing_nir   = detect_nir_timing(di_nir, img_id, q_iter_save, n_img_nir)
-    # timing_nir   = detect_nir_timing_v3(di_nir, img_id, q_iter_save, n_img_nir)
-    timing_piezo = detect_piezo_timing(ai_piezo, timing_stack[0, 0], timing_stack[-1, 1])
+    timing_confocal = np.column_stack(detect_confocal_timing_di(di_confocal)).T # confocal frame start stop times from digital input, shape (n_frames, 2)
+    timing_nir   = detect_nir_timing(di_nir, img_id, q_iter_save, n_img_nir) # NIR frame on off times from digital input, shape (n_nir, 2)
+    timing_piezo = detect_piezo_timing(ai_piezo, timing_confocal[0, 0], timing_confocal[-1, 1]) # piezo start stop times from analog input, shape (n_volumes, 2)
+
+    # Map each confocal DI event to its piezo volume (0-based, NaN if outside)
+    piezo_to_confocal = map_timestamps(timing_confocal, timing_piezo) # for each confocal frame, which piezo volume (i.e. confocal stack) it belongs to (0-based index, NaN if outside all volumes)
 
     confocal_to_nir  = []
-    nir_to_confocal  = np.zeros(timing_nir.shape[0], dtype=int)
+    # NaN by default: NIR frames before/after confocal recording or
+    # during gaps between piezo volumes will remain NaN.
+    nir_to_confocal  = np.full(timing_nir.shape[0], np.nan)
 
     for i in range(timing_piezo.shape[0]):
         start_, end_ = timing_piezo[i, :]
@@ -357,8 +367,8 @@ def sync_timing(di_confocal: np.ndarray,
 
         idx_ = np.where(nir_on_in & nir_off_in)[0]
         confocal_to_nir.append(idx_)
-        nir_to_confocal[idx_] = i + 1            # 1-based
+        nir_to_confocal[idx_] = i            # 0-based
         
     nir_time_sec = ((img_timestamp[q_iter_save] - img_timestamp[q_iter_save][0]) + timing_nir[0,0]) / 1e9 # convert to seconds and set first timestamp to first nir trigger
 
-    return confocal_to_nir, nir_to_confocal, timing_stack, timing_nir, timing_piezo, nir_time_sec
+    return confocal_to_nir, nir_to_confocal, timing_confocal, timing_nir, timing_piezo, nir_time_sec, piezo_to_confocal
