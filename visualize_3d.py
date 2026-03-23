@@ -37,6 +37,29 @@ def show_cube_volumetric(volume, colorscale='Greys_r', isomin=100, isomax=500, o
         width=800,
         height=800
     )
+
+    # make the background black
+    fig.update_layout(
+        template="plotly_dark", # Quickest way to set dark defaults
+        scene=dict(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False),
+            # This sets the color inside the 3D box
+            bgcolor='black' 
+        ),
+        # This sets the color outside the 3D box
+        paper_bgcolor='black', 
+        width=800,
+        height=800,
+        margin=dict(l=0, r=0, b=0, t=0) # Optional: removes white margins
+    )
+    # turn off grid lines
+    fig.update_layout(scene=dict(
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=False),
+        zaxis=dict(showgrid=False)
+    ))
     
     return fig
 
@@ -285,16 +308,39 @@ if __name__ == "__main__":
     # visualize 3d volume
 
 
-    data_path = r'D:\DATA\g5ht-immo\20260130\date-20260130_strain-nsIS180-ADFT_condition-immo-azide_worm002\tif'
-    # data_path = r'D:\DATA\g5ht-immo\20260130\date-20260130_strain-ADFT_condition-immo-azide_worm002_V3\tif'
-    data_fn = '0000.tif'
+    data_path = r'C:\Users\munib\POSTDOC\DATA\g5ht-free-8z_testtif'
+    data_fn = '0068_82z.tif'
+    chan = 0
+    ratio = False # ratio division not working currently
+
+    if chan == 0:
+        isomin=5
+        isomax=255
+        # cs = 'Greens_r'
+        cs = 'Inferno'
+        op = 0.5
+    elif chan == 1:
+        isomin=75
+        isomax=400
+        cs = 'Greys_r'
+        op = 0.2
+    elif ratio:
+        cs = 'Inferno'
+        op = 0.5
 
     data_full_path = os.path.join(data_path, data_fn)
 
     print("Loading data...")
-    volume = tifffile.imread(data_full_path)[:,1,:,:] # just the red channel
+    volume = tifffile.imread(data_full_path)[:,chan,:,:] # just one channel
+    if ratio:
+        volume = volume[:,0,:,:] / (volume[:,1,:,:]+1) # divide by red channel to correct for illumination, then visualize green channel
+        # isomin = np.percentile(volume, 5)
+        # isomax = np.percentile(volume, 99)
+        isomin = 0.0
+        isomax = 2
+        print(np.nanmin(volume), np.nanmax(volume))
     # volume = zoom(volume, (3, 1, 1), order=1) # downsample x and y by 2x using linear interpolation
-    volume = zoom(volume, (0.25, 0.25, 0.25), order=1) # downsample x and y by 2x using linear interpolation
+    volume = zoom(volume, (0.6, 0.3, 0.3), order=1) # downsample x and y by 2x using linear interpolation
 
     # volume = volume[0:27,:,:]
 
@@ -303,7 +349,7 @@ if __name__ == "__main__":
 
     # Create and display the visualization
     print("\nCreating visualization...")
-    fig = show_cube_volumetric(volume, colorscale='Reds', isomin=75, isomax=400, opacity=0.2, surface_count=25)
+    fig = show_cube_volumetric(volume, colorscale=cs, isomin=isomin, isomax=isomax, opacity=op, surface_count=25)
     fig.show()
 
     print("\nVisualization controls:")
