@@ -61,6 +61,8 @@ def get_3d_rigid_parameter_object(num_resolutions=3):
     """
     parameter_object = itk.ParameterObject.New()
     parameter_map = parameter_object.GetDefaultParameterMap('rigid', num_resolutions)
+
+    parameter_map['WriteResultImage'] = ['false']
     
     # Explicitly set EulerTransform for proper 3D rigid registration
     parameter_map['Transform'] = ['EulerTransform']
@@ -204,11 +206,13 @@ def process_one(index, input_nd2, noise_stack, out_dir, stack_shape=(41, 2, 512,
 
     except Exception as e:
         # Re-raise as RuntimeError so it can be pickled back to the parent process
-        raise RuntimeError(f"Frame {index}: {type(e).__name__}: {e}") from None
+        # raise RuntimeError(f"Frame {index}: {type(e).__name__}: {e}") from None
         # # Optionally, write an empty parameter file to indicate failure
         # with open(txt_fn, 'w') as f:
         #     f.write("# Registration failed\n")
         #     f.write(f"# Error: {e}\n")
+        # # do nothing
+        print(f"Frame {index}: {type(e).__name__}: {e}")
 
 def main():
     """

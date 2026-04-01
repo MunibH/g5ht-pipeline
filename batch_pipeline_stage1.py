@@ -60,7 +60,7 @@ DATASETS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datase
 
 # this should be "cuda:CUDA_DEVICE", nvidia-smi provides differnet gpu numbers
 # see flv-gpu reservation sheet; on flv-c2, 
-CUDA_DEVICE = 2 # one of 0, 1, 2, 3 
+CUDA_DEVICE = 1 # one of 0, 1, 2, 3 (1 is general gpu on flv-c2)
 
 
 def is_already_processed(nd2_path):
